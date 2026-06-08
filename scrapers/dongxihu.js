@@ -42,50 +42,58 @@ function extractDistrict(address) {
  * 推断招标范围（基于 titleName + xmNo）
  * 东西湖区政府采购类型：招标公告 / 竞争性磋商 / 单一来源 / 询价 等
  */
-function inferScope(item, demandKeywords = '') {
+/**
+ * 业务范围推断
+ * @param {Object} item - raw record
+ * @param {string} demandKeywords - 采购需求文本
+ * @param {Array|null} scopeRules -动态加载的规则数组，如果为 null 则使用内置规则
+ */
+function inferScope(item, demandKeywords = '', scopeRules = null) {
   const title = item.titleName || '';
-  const xmNo = item.xmNo || '';
-  const stockWay = item.stockWay || '';
   const bizText = title + ' ' + demandKeywords;
 
-  const tags = new Set();
-
-  // EPC（最高优先级）
-  if (/EPC|设计施工总承包|设计采购施工|交钥匙/.test(bizText)) {
-    tags.add('EPC');
-    return [...tags];
+  // 有动态规则时使用规则引擎
+  if (scopeRules && scopeRules.length > 0) {
+    const tags = [];
+    for (const rule of scopeRules) {
+      if (rule.regex.test(bizText)) {
+        tags.push(rule.tag);
+        if (rule.stopOnMatch) break;
+      }
+    }
+    return tags.length > 0 ? tags : ['其他'];
   }
 
-  // 从业务内容推断
-  if (/设计服务|初步设计|勘察设计|工程设计/.test(bizText)) tags.add('工程设计');
-  if (/工程监理|建设监理/.test(bizText)) tags.add('工程监理');
-  if (/造价咨询|预算编制|结算审核|跟踪审计/.test(bizText)) tags.add('造价咨询');
-  if (/工程勘察|岩土勘察|地质勘察/.test(bizText)) tags.add('工程勘察');
-  if (/招标代理/.test(bizText)) tags.add('招标代理');
-  if (/全过程工程咨询|全过程咨询/.test(bizText)) tags.add('全过程工程咨询');
-  if (/审计服务|决算审计|财务审计/.test(bizText)) tags.add('审计');
-  if (/项目管理/.test(bizText)) tags.add('咨询服务');
-  if (/手续代办|代建|代管/.test(bizText)) tags.add('手续代办');
-  // 通用服务类（无具体业务匹配时）
-  if (/服务|运维|管理|评估|代理|咨询/.test(bizText)) {
-    if (/运维/.test(bizText)) tags.add('运维服务');
-    else if (/代理/.test(bizText)) tags.add('代理服务');
-    else if (/评估|评价/.test(bizText)) tags.add('评估服务');
-    else if (/管理/.test(bizText)) tags.add('管理服务');
-    else tags.add('咨询服务');
-  }
-
-  // 采购方式（完全无业务标签时的兜底）
-  if (!tags.size) {
-    if (stockWay === '01') tags.add('公开招标');
-    else if (stockWay === '02') tags.add('邀请招标');
-    else if (stockWay === '03') tags.add('竞争性磋商');
-    else if (stockWay === '04') tags.add('单一来源');
-    else if (stockWay === '05') tags.add('询价');
-    else if (stockWay === '06') tags.add('竞争性磋商');
-  }
-
-  return tags.size ? [...tags] : ['其他'];
+  // 内置规则（无动态规则时回退）
+  if (/EPC|设计施工总承包|设计采购施工|交钥匙/.test(bizText)) return ['EPC'];
+  if (/设备采购|器械采购/.test(bizText)) return ['设备采购'];
+  if (/材料采购/.test(bizText)) return ['材料采购'];
+  if (/货物采购/.test(bizText)) return ['货物采购'];
+  if (/运维服务/.test(bizText)) return ['运维服务'];
+  if (/运维/.test(bizText)) return ['运维'];
+  if (/环卫/.test(bizText)) return ['环卫'];
+  if (/养护/.test(bizText)) return ['养护'];
+  if (/物业(?!服务)/.test(bizText)) return ['物业'];
+  if (/物业服务/.test(bizText)) return ['物业服务'];
+  if (/餐饮外包/.test(bizText)) return ['餐饮外包'];
+  if (/安保/.test(bizText)) return ['安保'];
+  if (/保洁/.test(bizText)) return ['保洁'];
+  if (/管护/.test(bizText)) return ['管护'];
+  if (/清淤/.test(bizText)) return ['清淤'];
+  if (/软件开发|系统集成/.test(bizText)) return ['软件开发'];
+  if (/信息化|智慧社区|智慧城市/.test(bizText)) return ['信息化服务'];
+  if (/污染调查|环境调查/.test(bizText)) return ['环境调查'];
+  if (/安全评估/.test(bizText)) return ['安全评估'];
+  if (/工程设计|设计服务|勘察设计|建筑设计/.test(bizText)) return ['建筑设计'];
+  if (/工程监理|建设监理|监理(?!服务)/.test(bizText)) return ['工程监理'];
+  if (/造价咨询|预算编制|造价预算/.test(bizText)) return ['造价预算'];
+  if (/工程项目管理|建设项目管理/.test(bizText)) return ['工程项目管理'];
+  if (/结算审核|结算审计|审计服务/.test(bizText)) return ['结算审计'];
+  if (/决算审核|决算审计/.test(bizText)) return ['决算审计'];
+  if (/全过程造价|造价跟踪|跟踪造价/.test(bizText)) return ['造价跟踪'];
+  if (/工程勘察|岩土勘察|地质勘查/.test(bizText)) return ['工程勘查'];
+  if (/全过程工程咨询/.test(bizText)) return ['全过程工程咨询'];
+  return ['其他'];
 }
 
 // 业务匹配规则（与 whzbtbxt 相同）
@@ -157,11 +165,11 @@ async function fetchDetail(uuid) {
   return d;
 }
 
-function mapToNotion(record) {
+function mapToNotion(record, scopeRules = null) {
   const htmlParsed = record.content ? parseHtmlContent(record.content, record.stockWay) : {};
   const qualParsed = record.content ? parseQualificationText(record.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')) : null;
 
-  const scopeTags = inferScope(record, htmlParsed.demandKeywords);
+  const scopeTags = inferScope(record, htmlParsed.demandKeywords, scopeRules);
   const businessMatch = inferBusinessMatch(scopeTags);
   const district = extractDistrict(record.titleName);
 
@@ -208,7 +216,7 @@ function mapToNotion(record) {
   return item;
 }
 
-async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = null } = {}) {
+async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = null, scopeRules = null } = {}) {
   console.log(`开始爬取东西湖区: ${pageCount} 页 × ${pageSize} 条`);
 
   const allItems = [];
@@ -220,7 +228,7 @@ async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = n
     for (const r of listData.records) {
       try {
         const detailData = await fetchDetail(r.uuid);
-        const item = mapToNotion(detailData);
+        const item = mapToNotion(detailData, scopeRules);
         allItems.push(item);
         console.log(`  ✓ ${item.title?.substring(0, 50)} | ${item.projectProgress ?? '?'} | ${item.businessMatch}`);
         if (onItem) onItem(item);

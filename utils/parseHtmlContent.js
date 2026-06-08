@@ -57,7 +57,8 @@ function parseHtmlContent(html, stockWay) {
   }
 
   // 7. 从采购需求文本推断业务类型（辅助 inferScope）
-  const demandText = matchOne(text, /采购需求[：:]\s*(\S[\s\S]{0,200}?)(?:合同|履行|获取|投标|$)/);
+  // 截断点设在"申请人资格要求"段之前，避免法律条款中的"监理/检测"等词干扰
+  const demandText = matchOne(text, /采购需求[：:]\s*([\s\S]{0,1000}?)(?=二、申请人的资格要求|三、获取招标文件|特定资格要求)/);
   result.demandKeywords = demandText || '';
 
   // 8. 联系电话（固定电话 3/4位-7/8位 或 手机 1开11位）

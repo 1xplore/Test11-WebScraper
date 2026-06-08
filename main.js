@@ -20,6 +20,7 @@ const fs = require('fs');
 const whzbtbxtScraper = require('./scrapers/whzbtbxt');
 const dongxihuScraper = require('./scrapers/dongxihu');
 const notion = require('./utils/notion');
+const { getScopeRules } = require('./utils/notionScopeRules');
 
 const DATA_DIR = path.join(__dirname, 'data');
 
@@ -37,13 +38,14 @@ async function uploadToNotion(items, options = {}) {
   return results;
 }
 
-async function runScraper(scraper, opts) {
+async function runScraper(scraper, opts, scopeRules = null) {
   const siteName = scraper.meta?.name || 'scraper';
   console.log(`\n[${siteName}] 开始`);
   const items = await scraper.run({
     pageCount: opts.pageCount,
     pageSize: opts.pageSize,
-    outputFile: opts.outputFile
+    outputFile: opts.outputFile,
+    scopeRules
   });
   if (opts.upload && items.length > 0) {
     await uploadToNotion(items, {
@@ -55,10 +57,11 @@ async function runScraper(scraper, opts) {
 }
 
 async function runAll(opts) {
+  const scopeRules = await getScopeRules();
   const summary = [];
   for (const [key, scraper] of Object.entries(SCRAPERS)) {
     try {
-      const r = await runScraper(scraper, opts);
+      const r = await runScraper(scraper, opts, scopeRules);
       summary.push({ site: key, ...r, status: 'ok' });
     } catch (e) {
       console.error(`[${key}] 失败: ${e.message}`);
@@ -119,7 +122,8 @@ async function main() {
         console.log(`可用的网站: ${Object.keys(SCRAPERS).join(', ')}`);
         process.exit(1);
       }
-      await runScraper(scraper, opts);
+      const scopeRules = await getScopeRules();
+      await runScraper(scraper, opts, scopeRules);
       console.log('\n✓ 全部完成');
     }
   } catch (error) {
