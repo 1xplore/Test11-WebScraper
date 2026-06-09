@@ -13,17 +13,40 @@
 ```
 ├── main.js                     # 入口：单站 / 全站运行
 ├── scripts/scheduled.js        # crontab 定时任务入口
+├── archive/                    # 临时脚本归档（不入 git）
+│   ├── debug-scripts/          # 历史 debug_*.js
+│   ├── test-scripts/           # 历史 test_*.js
+│   └── scrapers/               # explore_detail.js
 ├── scrapers/
-│   ├── whzbtbxt.js            # 武汉公共资源交易中心爬虫（纯 axios API）
-│   ├── dongxihu.js            # 东西湖区爬虫（API + HTML 正文解析）
-│   └── huangpi.js             # 黄陂区爬虫（API + HTML 正文解析，复用 parseHtmlContent）
+│   ├── platform.js            # 平台抽象基座：共享业务规则 + run 循环 + 反馈日志
+│   ├── whzbtbxt.js            # 武汉公共资源交易中心（声明性 config，约 90 行）
+│   ├── dongxihu.js            # 东西湖区（声明性 config，约 95 行）
+│   └── huangpi.js             # 黄陂区（声明性 config，约 95 行）
 ├── utils/
 │   ├── notion.js               # Notion API 封装（核心）
+│   ├── notionScopeRules.js     # 动态 scope 规则加载
 │   └── parseHtmlContent.js    # HTML 正文解析工具（dongxihu/huangpi 共用）
 ├── config/
-│   └── websites.js             # 各网站基础配置
+│   └── notionDatabases.js     # Notion 数据库 ID 集中配置
 └── data/                      # 爬取数据输出目录
 ```
+
+## 平台抽象（scrapers/platform.js）
+
+`platform.js` 是 3 站共用的爬虫基座，提供：
+
+- **共享业务规则**：`IN_SCOPE` / `OUT_OF_SCOPE` / `inferBusinessMatch` / `parseDate` / `extractDistrict` / `inferProgress` / `writeFeedbackLogs`
+- **平台工厂 `createPlatform(config)`**：每个站点通过 config 声明差异点
+
+**config 字段**：
+- `meta` — `{ name, homepage, sourcePageId, scriptId }`
+- `http.base` / `http.list` / `http.detail` — HTTP 调用形态（method/path/query/body/headers/unwrap/idKey）
+- `fields` — `{ id, title, projectCode, ... }` 字段映射（dict of functions）
+- `parseHtml` — `{ useContent, stockWay }` HTML 解析开关
+- `inferScope` 或 `inferScopeRules` — scope 推断（二选一）
+- `detailDelayMs` — 详情请求间隔（默认 300ms）
+
+**小钩子约束**：单站 fields/http 内业务逻辑代码总和 ≤ 30 行（声明性数据不计入）。
 
 ## 技术栈
 
@@ -100,7 +123,7 @@ OUT_OF_SCOPE: 施工, EPC, 工程总承包, 专业分包, 材料设备采购
 - **招标线索登记数据库**（实际数据写入）: `32d9e857b37a80f8bfdad0de856ee030`
 - **招标线索来源数据库**（平台配置）: `32d9e857b37a80d7ad08d8e7e1c81620`
 
-Token: `NOTION_TOKEN` 环境变量，代码里有 fallback。
+Token: `NOTION_TOKEN` 环境变量（必填，未设置时 Notion API 调用会因 `Bearer undefined` 头返回 401）。
 
 ## 定时任务
 

@@ -28,7 +28,7 @@
  *   - 结构同 scope 错误日志，供人类调优后写回资质规则库
  */
 
-const NOTION_TOKEN = process.env.NOTION_TOKEN || 'process.env.NOTION_TOKEN';
+const NOTION_TOKEN = process.env.NOTION_TOKEN;
 
 // 主数据库
 const NOTICE_DB = '32d9e857b37a80f8bfdad0de856ee030';

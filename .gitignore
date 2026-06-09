@@ -7,3 +7,5 @@ logs/*.log
 .env
 *.log
 .DS_Store
+# 临时脚本归档（不入 git）
+archive/
