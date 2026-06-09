@@ -111,20 +111,23 @@ Token: `NOTION_TOKEN` 环境变量，代码里有 fallback。
 
 ## 部署（阿里云 47.122.112.224）
 
+服务器代码目录 `/home/admin/scraper/Test11-WebScraper` 是 gitee 仓库的工作区，部署 = 在服务器上 git 同步。**不动 data/ 和 logs/**。
+
 ```bash
-# 打包（排除 node_modules 和 data）
-tar --exclude='node_modules' --exclude='data/*.{json,html,png,txt}' \
-    -czf /tmp/scraper.tar.gz Test11-WebScraper/
+# 本地推送
+git push gitee master
 
-# 上传到服务器
-scp /tmp/scraper.tar.gz admin@47.122.112.224:/tmp/
-
-# 服务器解压安装
+# 服务器拉取并对齐到远端
 ssh admin@47.122.112.224 \
-  "rm -rf /home/admin/scraper/Test11-WebScraper && \
-   tar -xzf /tmp/scraper.tar.gz -C /home/admin/scraper/ && \
-   cd /home/admin/scraper/Test11-WebScraper && npm install"
+  "cd /home/admin/scraper/Test11-WebScraper && \
+   git fetch gitee && git reset --hard gitee/master && \
+   (git diff HEAD@{1} HEAD --name-only | grep -q package.json && npm install || true)"
 ```
+
+注意事项：
+- 不要用 `scp + tar -xzf`：macOS 打包会生成 `._*` AppleDouble 脏文件，且会覆盖服务器现有 `data/logs`
+- 若历史上有 scp 残留 `._*`：`find /home/admin/scraper/Test11-WebScraper -name "._*" -delete`
+- 服务器 git 远端仅配置 gitee（origin 是 github，未启用）
 
 ## 新增站点流程
 
