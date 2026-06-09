@@ -46,14 +46,23 @@ function parseHtmlContent(html, stockWay) {
   // 5. 采购代理机构名称
   result.agencyCorp = matchOne(text, /采购代理机构信息[\s\S]{0,100}?名称[：:]\s*(\S{2,50})/);
 
-  // 6. 投标截止时间
-  const bidDeadline = matchOne(text, /(?:提交投标文件)?截止时间[：:]\s*(\d{4}年\d{1,2}月\d{1,2}日\s*\d{1,2}[点時]\d{1,2}分?)/);
-  if (bidDeadline) {
-    // 转换 "2026年06月24日09点30分" -> "2026-06-24 09:30"
-    const normalized = bidDeadline
+  // 6. 投标截止时间，兼容两种格式：
+  //   东西湖: "2026年06月24日09点30分"
+  //   黄陂区: "2026-06-23 09:30"
+  const bidDeadlineCN = matchOne(text, /(?:提交投标文件)?截止时间[：:]\s*(\d{4}年\d{1,2}月\d{1,2}日\s*\d{1,2}[点時]\d{1,2}分?)/);
+  const bidDeadlineISO = !bidDeadlineCN
+    ? matchOne(text, /(?:提交投标文件|响应文件)?截止时间[：:]\s*(\d{4}-\d{1,2}-\d{1,2}\s+\d{1,2}:\d{2})/)
+    : null;
+  if (bidDeadlineCN) {
+    result.bidSubmitDeadline = bidDeadlineCN
       .replace(/年(\d{1,2})月(\d{1,2})日/, (_, m, d) => `-${m.padStart(2,'0')}-${d.padStart(2,'0')}`)
       .replace(/(\d{1,2})[点時](\d{1,2})分?/, (_, h, min) => ` ${h.padStart(2,'0')}:${min}`);
-    result.bidSubmitDeadline = normalized;
+  } else if (bidDeadlineISO) {
+    // 规范化日期段补零
+    result.bidSubmitDeadline = bidDeadlineISO.replace(
+      /^(\d{4})-(\d{1,2})-(\d{1,2})\s+(\d{1,2}):(\d{2})$/,
+      (_, y, m, d, h, min) => `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')} ${h.padStart(2,'0')}:${min}`
+    );
   }
 
   // 7. 从采购需求文本推断业务类型（辅助 inferScope）
@@ -134,4 +143,29 @@ function parseQualificationText(text) {
   return results.length > 0 ? results : null;
 }
 
-module.exports = { parseHtmlContent, parseQualificationText, STOCK_WAY_MAP };
+/**
+ * 提取"本项目的特定资格要求："所属段落的原文（含标签）
+ * 用于资质识别失败时回写到错误日志，便于人工调优
+ *
+ * 段落规则（武汉地区多个采购站点格式一致）：
+ *   开始：含"本项目的特定资格要求"的子串
+ *   结束：下一章节"三、"（"获取招标文件"），找不到则截 500 字符兜底
+ * 返回包含标签自身（如"6. 本项目的特定资格要求：xxx"），便于人工识别
+ *
+ * @param {string} text - HTML 去标签后的纯文本
+ * @returns {string|null}
+ */
+function extractQualSection(text) {
+  if (!text) return null;
+  const startIdx = text.indexOf('本项目的特定资格要求');
+  if (startIdx < 0) return null;
+  // 向前回看 5 字符抓上标号（如 "6. "）
+  const headStart = Math.max(0, startIdx - 5);
+  const after = text.substring(headStart);
+  // 终止于"三、"或"三 、"（下一章节）
+  const endMatch = after.search(/三\s*、/);
+  const segment = endMatch > 0 ? after.substring(0, endMatch) : after.substring(0, 500);
+  return segment.trim();
+}
+
+module.exports = { parseHtmlContent, parseQualificationText, extractQualSection, STOCK_WAY_MAP };

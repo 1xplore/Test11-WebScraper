@@ -6,6 +6,7 @@
 
 - **武汉公共资源交易中心** (whzbtbxt): https://www.whzbtbxt.cn — Vue SPA + 后端 API
 - **东西湖区政府采购电子交易系统** (dongxihu): http://zfcg.dxh.gov.cn:9090 — Angular + LayUI 后端 API
+- **黄陂区政府采购交易系统** (huangpi): http://47.111.115.168:10013 — Vue SPA (czy-portal) + 后端 API
 
 ## 项目结构
 
@@ -14,10 +15,11 @@
 ├── scripts/scheduled.js        # crontab 定时任务入口
 ├── scrapers/
 │   ├── whzbtbxt.js            # 武汉公共资源交易中心爬虫（纯 axios API）
-│   └── dongxihu.js            # 东西湖区爬虫（API + HTML 正文解析）
+│   ├── dongxihu.js            # 东西湖区爬虫（API + HTML 正文解析）
+│   └── huangpi.js             # 黄陂区爬虫（API + HTML 正文解析，复用 parseHtmlContent）
 ├── utils/
 │   ├── notion.js               # Notion API 封装（核心）
-│   └── parseHtmlContent.js    # HTML 正文解析工具（东西湖区专用）
+│   └── parseHtmlContent.js    # HTML 正文解析工具（dongxihu/huangpi 共用）
 ├── config/
 │   └── websites.js             # 各网站基础配置
 └── data/                      # 爬取数据输出目录
@@ -26,7 +28,7 @@
 ## 技术栈
 
 - **axios** — HTTP 请求（所有 API 调用）
-- **cheerio** — HTML 解析（东西湖区详情 HTML 正文）
+- **cheerio** — HTML 解析（详情 HTML 正文）
 - **playwright** — 动态页面渲染（仅 whzbtbxt 备用，已切纯 API）
 
 ## 运行命令
@@ -35,6 +37,7 @@
 # 单站运行
 node main.js whzbtbxt --pages 1 --size 10
 node main.js dongxihu --pages 1 --size 5
+node main.js huangpi --pages 1 --size 5
 
 # 强制更新（跳过已存在检查）
 node main.js dongxihu --pages 1 --size 5 --no-skip-existing
@@ -134,5 +137,6 @@ ssh admin@47.122.112.224 \
 ## 关键约束
 
 - **不删除 Notion 记录**：只能归档已结项记录，不能清理
-- **资质字段**：东西湖区大多数公告无特定资质要求；少数有资质要求的格式为"XX级资质（行业限定）"
-- **频率限制**：东西湖区 API 建议详情请求间隔 ≥300ms，避免触发限流
+- **资质字段**：东西湖/黄陂大多数公告无特定资质要求；少数有资质要求的格式为"XX级资质（行业限定）"
+- **资质错误日志原文**：`extractQualSection()` 从正文截取"本项目的特定资格要求："到"三、"之间段落，作为反馈日志的"原始文本"
+- **频率限制**：东西湖/黄陂 API 详情请求间隔 ≥300ms，避免触发限流
