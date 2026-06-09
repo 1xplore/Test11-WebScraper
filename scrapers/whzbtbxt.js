@@ -318,7 +318,7 @@ async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = n
   }
 
   console.log(`\n爬取完成: ${allItems.length} 条`);
-  return allItems;
+  return { items: allItems };
 }
 
 module.exports = {
