@@ -20,6 +20,7 @@ const fs = require('fs');
 const whzbtbxtScraper = require('./scrapers/whzbtbxt');
 const dongxihuScraper = require('./scrapers/dongxihu');
 const huangpiScraper = require('./scrapers/huangpi');
+const caidianScraper = require('./scrapers/caidian');
 const notion = require('./utils/notion');
 const { getScopeRules } = require('./utils/notionScopeRules');
 
@@ -28,7 +29,8 @@ const DATA_DIR = path.join(__dirname, 'data');
 const SCRAPERS = {
   whzbtbxt: whzbtbxtScraper,
   dongxihu: dongxihuScraper,
-  huangpi: huangpiScraper
+  huangpi: huangpiScraper,
+  caidian: caidianScraper
 };
 
 async function uploadToNotion(items, options = {}) {

@@ -33,10 +33,11 @@ const NOTION_TOKEN = process.env.NOTION_TOKEN;
 // 主数据库
 const NOTICE_DB = '32d9e857b37a80f8bfdad0de856ee030';
 
-// 平台配置（仅 dongxihu.js / huangpi.js 的 sourcePageId 使用，whzbtbxt 已废弃 API 方式）
+// 平台配置（仅 dongxihu.js / huangpi.js / caidian.js 的 sourcePageId 使用，whzbtbxt 已废弃 API 方式）
 const SOURCE_PAGES = {
   dongxihu: '32d9e857-b37a-81bf-9976-c49aa0e892aa',
   huangpi: '32d9e857-b37a-8138-9649-cf435a5d3ffa',
+  caidian: '32d9e857-b37a-818c-9196-d04116a5114f',
 };
 
 // 规则库（人类可编辑，爬虫每日同步）
