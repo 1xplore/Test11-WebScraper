@@ -44,8 +44,10 @@ const KNOWN_VALUES = {
   ])
 };
 
+const { NOTION_TOKEN, NOTICE_DB } = require('../config/notionDatabases');
+
 function getNotionToken() {
-  return process.env.NOTION_TOKEN || 'process.env.NOTION_TOKEN';
+  return NOTION_TOKEN;
 }
 
 function notionHeaders() {
@@ -318,9 +320,7 @@ async function updatePage(pageId, properties) {
  * @returns {Object} { status: 'created'|'updated'|'skipped', pageId, error? }
  */
 async function uploadItem(item, options = {}) {
-  const databaseId = options.databaseId
-    || process.env.NOTION_DATABASE_ID
-    || '32d9e857b37a80f8bfdad0de856ee030';
+  const databaseId = options.databaseId || NOTICE_DB;
 
   const properties = buildPageProperties(item, options);
   if (Object.keys(properties).length === 0) {

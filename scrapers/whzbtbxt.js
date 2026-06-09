@@ -5,6 +5,7 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
+const { SOURCE_PAGES } = require('../config/notionDatabases');
 
 const LIST_API = 'https://www.whzbtbxt.cn/whebd-server/cmsHomePage/tendererNoticeList';
 const DETAIL_API = 'https://www.whzbtbxt.cn/whebd-server/cmsHomePage/tendererNoticeDetail';
@@ -336,7 +337,7 @@ module.exports = {
   meta: {
     name: '武汉市公共资源交易平台招投标系统',
     homepage: 'https://www.whzbtbxt.cn/',
-    sourcePageId: '32d9e857-b37a-81c6-948b-f10412e25db3',
+    sourcePageId: null, // whzbtbxt 已切换纯 API，无需 sourcePageId
     scriptId: 'wuhan_public'
   }
 };

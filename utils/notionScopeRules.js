@@ -9,20 +9,17 @@
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
-
-// __filename 解析到实际路径，避免 OneDrive symlink 问题
-const SCOPE_DIR = path.resolve(path.dirname(__filename), '..');
-const CACHE_FILE = path.join(SCOPE_DIR, 'data', 'scopeRulesCache.json');
+const { NOTION_TOKEN, SCOPE_RULES_DB } = require('../config/notionDatabases');
 
 const NOTION_BASE = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
-const RULES_DATABASE_ID = '3799e857b37a806c836fcdcf73af63d5';
+const CACHE_FILE = path.join(__dirname, '..', 'data', 'scopeRulesCache.json');
 
 // 内存缓存，进程内只加载一次
 let _cachedRules = null;
 
 function getNotionToken() {
-  return process.env.NOTION_TOKEN || 'process.env.NOTION_TOKEN';
+  return NOTION_TOKEN;
 }
 
 function notionHeaders() {
@@ -105,12 +102,12 @@ function buildRegex(keywordList) {
  * @returns {Array} [{ priority, regex, tag, stopOnMatch }]
  */
 async function loadScopeRules() {
-  const pages = await fetchAllPages(RULES_DATABASE_ID);
+  const pages = await fetchAllPages(SCOPE_RULES_DB);
 
   const rules = pages.map(page => {
     const props = page.properties;
-    const keywordList = props['Name']?.title?.[0]?.plain_text || '';
-    const tag = props['Tag名称']?.rich_text?.[0]?.plain_text || '';
+    const keywordList = props['应匹配内容']?.rich_text?.[0]?.plain_text || '';
+    const tag = props['应映射为']?.title?.[0]?.plain_text || '';
     const behavior = props['匹配行为']?.select?.name || 'stop';
     const priority = props['优先级']?.number ?? 999;
 
@@ -185,4 +182,4 @@ async function printRules() {
   }
 }
 
-module.exports = { getScopeRules, printRules, RULES_DATABASE_ID };
+module.exports = { getScopeRules, printRules };

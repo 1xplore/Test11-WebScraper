@@ -8,6 +8,9 @@ const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const { parseHtmlContent, parseQualificationText } = require('../utils/parseHtmlContent');
+const { SOURCE_PAGES, NOTION_TOKEN, SCOPE_ERROR_LOG_DB, QUAL_ERROR_LOG_DB } = require('../config/notionDatabases');
+const NOTION_API = 'https://api.notion.com/v1';
+const NOTION_VERSION = '2022-06-28';
 
 const BASE = 'http://zfcg.dxh.gov.cn:9090/dxh';
 const LIST_API = '/announce/editQueryMore';
@@ -167,19 +170,24 @@ async function fetchDetail(uuid) {
 
 function mapToNotion(record, scopeRules = null) {
   const htmlParsed = record.content ? parseHtmlContent(record.content, record.stockWay) : {};
-  const qualParsed = record.content ? parseQualificationText(record.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')) : null;
+  const plainText = record.content ? record.content.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') : '';
+  const qualParsed = record.content ? parseQualificationText(plainText) : null;
 
   const scopeTags = inferScope(record, htmlParsed.demandKeywords, scopeRules);
   const businessMatch = inferBusinessMatch(scopeTags);
   const district = extractDistrict(record.titleName);
 
-  // 资质要求：优先取特定资格要求段落，否则用采购需求文本
-  let requirement = null;
-  if (qualParsed && qualParsed.length > 0) {
-    requirement = qualParsed.map(q => q.raw).join('\n');
-  } else if (htmlParsed.demandKeywords) {
-    requirement = htmlParsed.demandKeywords;
-  }
+  // 资质要求：仅从"特定资格要求"段落匹配，未匹配到则留空
+  const requirement = (qualParsed && qualParsed.length > 0)
+    ? qualParsed.map(q => q.raw).join('\n')
+    : null;
+
+  // 资质标记：原文是否写明"特定资格要求：无"（真无，不需日志）
+  const qualExplicitNone = /特定资格要求[：:]\s*无/i.test(plainText);
+
+  // 用于 scope 匹配的原始文本（标题 + 需求关键词）
+  const scopeMatchText = [record.titleName, htmlParsed.demandKeywords || '']
+    .filter(Boolean).join(' ');
 
   const item = {
     id: record.uuid,
@@ -209,14 +217,74 @@ function mapToNotion(record, scopeRules = null) {
     tenderLinkPhone: htmlParsed.tenderPhone || null,
     tenderLinkMan: htmlParsed.projectContact || null,
     agencyLinkPhone: htmlParsed.agencyPhone || null,
-    _raw: record
+    _raw: record,
+    // 反馈调优用（不上传 Notion）
+    _scopeMatchText: scopeMatchText,
+    _qualExplicitNone: qualExplicitNone
   };
 
   item.projectProgress = inferProgress(item);
   return item;
 }
 
-async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = null, scopeRules = null } = {}) {
+function errorLogHeaders() {
+  return {
+    'Authorization': `Bearer ${NOTION_TOKEN}`,
+    'Notion-Version': NOTION_VERSION,
+    'Content-Type': 'application/json'
+  };
+}
+
+async function createErrorLogPage(databaseId, properties) {
+  const res = await axios.post(`${NOTION_API}/pages`, {
+    parent: { database_id: databaseId },
+    properties
+  }, { headers: errorLogHeaders() });
+  return res.data;
+}
+
+/**
+ * 写反馈日志（scope 未识别 / 资质未识别）到 Notion 错误日志数据库
+ * @param {Array} items - mapToNotion 输出的完整 items
+ * @param {Object} results - notion.uploadItems 返回结果（含 details 数组）
+ */
+async function writeFeedbackLogs(items, results) {
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const result = results.details?.[i];
+    if (!result || result.status === 'skipped' || result.status === 'error') continue;
+    const pageId = result.pageId;
+
+    // scope 未识别（scopeTags = ['其他']）
+    const scopeUnmatched = item.scopeTags?.length === 1 && item.scopeTags[0] === '其他';
+    if (scopeUnmatched) {
+      try {
+        await createErrorLogPage(SCOPE_ERROR_LOG_DB, {
+          '来源招标公告': { relation: [{ id: pageId }] },
+          '原始文本': { rich_text: [{ text: { content: item._scopeMatchText || '' } }] },
+        });
+        console.log(`  [scope反馈] 已写入 ${pageId}`);
+      } catch (e) {
+        console.error(`  [scope反馈] 写入失败: ${e.message}`);
+      }
+    }
+
+    // 资质未识别（排除"特定资格要求：无"）
+    if (!item.requirement && !item._qualExplicitNone) {
+      try {
+        await createErrorLogPage(QUAL_ERROR_LOG_DB, {
+          '来源招标公告': { relation: [{ id: pageId }] },
+          '原始文本': { rich_text: [{ text: { content: item._scopeMatchText || '' } }] },
+        });
+        console.log(`  [qual反馈] 已写入 ${pageId}`);
+      } catch (e) {
+        console.error(`  [qual反馈] 写入失败: ${e.message}`);
+      }
+    }
+  }
+}
+
+async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = null, scopeRules = null, uploadResults = null } = {}) {
   console.log(`开始爬取东西湖区: ${pageCount} 页 × ${pageSize} 条`);
 
   const allItems = [];
@@ -246,7 +314,7 @@ async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = n
   }
 
   console.log(`\n爬取完成: ${allItems.length} 条`);
-  return allItems;
+  return { items: allItems, uploadResults };
 }
 
 module.exports = {
@@ -258,17 +326,18 @@ module.exports = {
   inferScope,
   inferBusinessMatch,
   inferProgress,
+  writeFeedbackLogs,
   meta: {
     name: '东西湖区政府采购电子交易系统',
     homepage: 'http://zfcg.dxh.gov.cn:9090/dxh/views/announce/home.html',
-    sourcePageId: '32d9e857-b37a-81bf-9976-c49aa0e892aa',
+    sourcePageId: SOURCE_PAGES.dongxihu,
     scriptId: 'wuhan_dongxihu_district'
   }
 };
 
 if (require.main === module) {
   run({ pageCount: 1, pageSize: 5, outputFile: 'dongxihu_test.json' })
-    .then(() => process.exit(0))
+    .then(({ items }) => process.exit(0))
     .catch(e => {
       console.error('失败:', e);
       process.exit(1);

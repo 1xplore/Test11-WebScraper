@@ -41,17 +41,20 @@ async function uploadToNotion(items, options = {}) {
 async function runScraper(scraper, opts, scopeRules = null) {
   const siteName = scraper.meta?.name || 'scraper';
   console.log(`\n[${siteName}] 开始`);
-  const items = await scraper.run({
+  const { items, uploadResults } = await scraper.run({
     pageCount: opts.pageCount,
     pageSize: opts.pageSize,
     outputFile: opts.outputFile,
     scopeRules
   });
   if (opts.upload && items.length > 0) {
-    await uploadToNotion(items, {
+    const results = await uploadToNotion(items, {
       skipExisting: opts.skipExisting,
       sourcePageId: scraper.meta?.sourcePageId
     });
+    if (scraper.writeFeedbackLogs) {
+      await scraper.writeFeedbackLogs(items, results);
+    }
   }
   return { siteName, count: items.length };
 }
