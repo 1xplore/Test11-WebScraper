@@ -36,6 +36,7 @@ const NOTICE_DB = '32d9e857b37a80f8bfdad0de856ee030';
 // 平台配置（各 scraper 的 sourcePageId 使用）
 const SOURCE_PAGES = {
   whzbtbxt: '32d9e857-b37a-81c6-948b-f10412e25db3',
+  whzfcgxt: '32d9e857-b37a-8185-b7ff-ca88f1477627',
   dongxihu: '32d9e857-b37a-81bf-9976-c49aa0e892aa',
   huangpi: '32d9e857-b37a-8138-9649-cf435a5d3ffa',
   caidian: '32d9e857-b37a-818c-9196-d04116a5114f',
@@ -52,6 +53,7 @@ const SOURCE_PAGES = {
   jiangan: '32d9e857-b37a-815c-9f82-d6c27315d235',
   jianghan: '32d9e857-b37a-8199-8c8f-d7b20c715623',
   wuchang: '32d9e857-b37a-8151-b58d-fd92c305f85b',
+  hubeigov: '32d9e857-b37a-818a-8961-fea67ae05d5e',
 };
 
 // 规则库（人类可编辑，爬虫每日同步）

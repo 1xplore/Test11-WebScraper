@@ -168,7 +168,10 @@ async function writeFeedbackLogs(items, results, meta) {
 // === HTTP 抽象 ===
 
 async function callEndpoint(spec, base, pageOrId, size, timeRange) {
-  const url = `${base}${spec.path}`;
+  const pathStr = typeof spec.path === 'function'
+    ? spec.path(pageOrId, size, timeRange)
+    : spec.path;
+  const url = `${base}${pathStr}`;
   const query = typeof spec.query === 'function'
     ? spec.query(pageOrId, size, timeRange)
     : spec.query || null;
@@ -187,13 +190,17 @@ async function callEndpoint(spec, base, pageOrId, size, timeRange) {
     const res = await axios.get(url, opts);
     return res.data;
   }
-  // POST: form-encoded body
+  // POST: 默认 form-encoded；spec.bodyType='json' 则发 JSON
   if (body) {
-    const form = new URLSearchParams();
-    for (const [k, v] of Object.entries(body)) {
-      if (v != null) form.append(k, String(v));
+    if (spec.bodyType === 'json') {
+      opts.data = JSON.stringify(body);
+    } else {
+      const form = new URLSearchParams();
+      for (const [k, v] of Object.entries(body)) {
+        if (v != null) form.append(k, String(v));
+      }
+      opts.data = form.toString();
     }
-    opts.data = form.toString();
   } else {
     opts.data = '';
   }
@@ -325,9 +332,11 @@ function createPlatform({
       const listData = await fetchList(pageNum, pageSize, timeRange);
       const records = listData.records || [];
       const total = listData.total ?? records.length;
-      console.log(`  总数: ${total}, 当前页 ${records.length} 条`);
+      // actualPageSize: 服务端真实返回条数（unwrap 内已做过滤时与 records.length 不一致）
+      const actualSize = listData.actualPageSize ?? records.length;
+      console.log(`  总数: ${total}, 当前页 ${records.length} 条 (raw=${actualSize})`);
 
-      if (records.length === 0) {
+      if (actualSize === 0) {
         stopReason = 'empty_page';
         break;
       }
@@ -366,7 +375,7 @@ function createPlatform({
         }
       }
       if (pageShouldStop) break;
-      if (records.length < pageSize) {
+      if (actualSize < pageSize) {
         stopReason = 'last_page';
         break;
       }

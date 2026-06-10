@@ -19,6 +19,7 @@ const path = require('path');
 const fs = require('fs');
 
 const whzbtbxtScraper = require('./scrapers/whzbtbxt');
+const whzfcgxtScraper = require('./scrapers/whzfcgxt');
 const dongxihuScraper = require('./scrapers/dongxihu');
 const huangpiScraper = require('./scrapers/huangpi');
 const caidianScraper = require('./scrapers/caidian');
@@ -35,6 +36,7 @@ const jiangxiaScraper = require('./scrapers/jiangxia');
 const jianganScraper = require('./scrapers/jiangan');
 const jianghanScraper = require('./scrapers/jianghan');
 const wuchangScraper = require('./scrapers/wuchang');
+const hubeigovScraper = require('./scrapers/hubeigov');
 const notion = require('./utils/notion');
 const { getScopeRules } = require('./utils/notionScopeRules');
 const { getLastScrapeTime, createScrapeLog } = require('./utils/scrapeLog');
@@ -44,6 +46,7 @@ const DATA_DIR = path.join(__dirname, 'data');
 
 const SCRAPERS = {
   whzbtbxt: whzbtbxtScraper,
+  whzfcgxt: whzfcgxtScraper,
   dongxihu: dongxihuScraper,
   huangpi: huangpiScraper,
   caidian: caidianScraper,
@@ -59,7 +62,8 @@ const SCRAPERS = {
   jiangxia: jiangxiaScraper,
   jiangan: jianganScraper,
   jianghan: jianghanScraper,
-  wuchang: wuchangScraper
+  wuchang: wuchangScraper,
+  hubeigov: hubeigovScraper
 };
 
 /**
