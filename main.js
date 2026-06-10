@@ -24,6 +24,16 @@ const caidianScraper = require('./scrapers/caidian');
 const jingkaiScraper = require('./scrapers/jingkai');
 const changjiangxinquScraper = require('./scrapers/changjiangxinqu');
 const xinzhouScraper = require('./scrapers/xinzhou');
+const qingshanScraper = require('./scrapers/qingshan');
+const hongshanScraper = require('./scrapers/hongshan');
+const donghuwxScraper = require('./scrapers/donghuwx');
+const qiaokouScraper = require('./scrapers/qiaokou');
+const hanyangScraper = require('./scrapers/hanyang');
+const donghuScraper = require('./scrapers/donghu');
+const jiangxiaScraper = require('./scrapers/jiangxia');
+const jianganScraper = require('./scrapers/jiangan');
+const jianghanScraper = require('./scrapers/jianghan');
+const wuchangScraper = require('./scrapers/wuchang');
 const notion = require('./utils/notion');
 const { getScopeRules } = require('./utils/notionScopeRules');
 
@@ -36,7 +46,17 @@ const SCRAPERS = {
   caidian: caidianScraper,
   jingkai: jingkaiScraper,
   changjiangxinqu: changjiangxinquScraper,
-  xinzhou: xinzhouScraper
+  xinzhou: xinzhouScraper,
+  qingshan: qingshanScraper,
+  hongshan: hongshanScraper,
+  donghuwx: donghuwxScraper,
+  qiaokou: qiaokouScraper,
+  hanyang: hanyangScraper,
+  donghu: donghuScraper,
+  jiangxia: jiangxiaScraper,
+  jiangan: jianganScraper,
+  jianghan: jianghanScraper,
+  wuchang: wuchangScraper
 };
 
 async function uploadToNotion(items, options = {}) {

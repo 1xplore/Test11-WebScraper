@@ -42,6 +42,16 @@ const SOURCE_PAGES = {
   jingkai: '32d9e857-b37a-81b4-a04a-f2cfc0d7b919',
   changjiangxinqu: '32d9e857-b37a-8152-a9a8-d0ca57fa764d',
   xinzhou: '32d9e857-b37a-81a3-9134-da74d244e733',
+  qingshan: '32d9e857-b37a-8119-b832-cbb73665fc42',
+  hongshan: '32d9e857-b37a-819f-970c-ed0f92f64e0e',
+  donghuwx: '32d9e857-b37a-81cb-bc74-f7bfcaf7ee2d',
+  qiaokou: '32d9e857-b37a-81fa-93c0-f693f8eaec21',
+  hanyang: '32d9e857-b37a-811d-a443-fb8256ad566a',
+  donghu: '32d9e857-b37a-81a2-9f39-f20313067cdf',
+  jiangxia: '32d9e857-b37a-81ff-8c4d-f4cff55b8b14',
+  jiangan: '32d9e857-b37a-815c-9f82-d6c27315d235',
+  jianghan: '32d9e857-b37a-8199-8c8f-d7b20c715623',
+  wuchang: '32d9e857-b37a-8151-b58d-fd92c305f85b',
 };
 
 // 规则库（人类可编辑，爬虫每日同步）
