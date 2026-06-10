@@ -21,6 +21,9 @@ const whzbtbxtScraper = require('./scrapers/whzbtbxt');
 const dongxihuScraper = require('./scrapers/dongxihu');
 const huangpiScraper = require('./scrapers/huangpi');
 const caidianScraper = require('./scrapers/caidian');
+const jingkaiScraper = require('./scrapers/jingkai');
+const changjiangxinquScraper = require('./scrapers/changjiangxinqu');
+const xinzhouScraper = require('./scrapers/xinzhou');
 const notion = require('./utils/notion');
 const { getScopeRules } = require('./utils/notionScopeRules');
 
@@ -30,7 +33,10 @@ const SCRAPERS = {
   whzbtbxt: whzbtbxtScraper,
   dongxihu: dongxihuScraper,
   huangpi: huangpiScraper,
-  caidian: caidianScraper
+  caidian: caidianScraper,
+  jingkai: jingkaiScraper,
+  changjiangxinqu: changjiangxinquScraper,
+  xinzhou: xinzhouScraper
 };
 
 async function uploadToNotion(items, options = {}) {
