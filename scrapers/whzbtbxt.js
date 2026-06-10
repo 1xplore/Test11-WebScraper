@@ -107,14 +107,14 @@ module.exports = createPlatform({
     list: {
       method: 'POST',
       path: '/cmsHomePage/tendererNoticeList',
-      body: (page, size) => ({
+      body: (page, size, tr) => ({
         t: String(Date.now()),
         tenderPrjName: '',
         evaluationMethod: '',
         prjbuildCorpName: '',
         regulators: '',
-        noticeStartDate: '',
-        noticeEndDate: '',
+        noticeStartDate: tr?.from ? tr.from.toISOString().slice(0, 10) : '',
+        noticeEndDate: tr?.to ? tr.to.toISOString().slice(0, 10) : '',
         bmFlag: '',
         prequalificationType: '',
         registrationId: '',
@@ -126,7 +126,8 @@ module.exports = createPlatform({
         if (!r.result) throw new Error(`列表 API 返回错误: ${r.msg}`);
         return r.data;
       },
-      idKey: 'id'
+      idKey: 'id',
+      supportsTimeFilter: true
     },
     detail: {
       method: 'POST',

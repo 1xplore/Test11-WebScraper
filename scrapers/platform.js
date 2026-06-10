@@ -37,6 +37,7 @@ const {
   SCOPE_ERROR_LOG_DB,
   QUAL_ERROR_LOG_DB
 } = require('../config/notionDatabases');
+const { getLastSeenAnnouncementForSource } = require('../utils/scrapeLog');
 
 const NOTION_API = 'https://api.notion.com/v1';
 const NOTION_VERSION = '2022-06-28';
@@ -125,7 +126,9 @@ async function createErrorLogPage(databaseId, properties) {
 }
 
 async function writeFeedbackLogs(items, results, meta) {
-  if (!results) return;
+  if (!results) return { scopeIds: [], qualIds: [] };
+  const scopeIds = [];
+  const qualIds = [];
   for (let i = 0; i < items.length; i++) {
     const item = items[i];
     const result = results.details?.[i];
@@ -135,11 +138,12 @@ async function writeFeedbackLogs(items, results, meta) {
     const scopeUnmatched = item.scopeTags?.length === 1 && item.scopeTags[0] === '其他';
     if (scopeUnmatched && SCOPE_ERROR_LOG_DB) {
       try {
-        await createErrorLogPage(SCOPE_ERROR_LOG_DB, {
+        const page = await createErrorLogPage(SCOPE_ERROR_LOG_DB, {
           '来源招标公告': { relation: [{ id: pageId }] },
           '原始文本': { rich_text: [{ text: { content: item._scopeMatchText || '' } }] },
         });
-        console.log(`  [scope反馈] 已写入 ${pageId}`);
+        scopeIds.push(page.id);
+        console.log(`  [scope反馈] 已写入 ${page.id}`);
       } catch (e) {
         console.error(`  [scope反馈] 写入失败: ${e.message}`);
       }
@@ -147,27 +151,29 @@ async function writeFeedbackLogs(items, results, meta) {
 
     if (!item.requirement && !item._qualExplicitNone && QUAL_ERROR_LOG_DB) {
       try {
-        await createErrorLogPage(QUAL_ERROR_LOG_DB, {
+        const page = await createErrorLogPage(QUAL_ERROR_LOG_DB, {
           '来源招标公告': { relation: [{ id: pageId }] },
           '原始文本': { rich_text: [{ text: { content: item._qualMatchText || item._scopeMatchText || '' } }] },
         });
-        console.log(`  [qual反馈] 已写入 ${pageId}`);
+        qualIds.push(page.id);
+        console.log(`  [qual反馈] 已写入 ${page.id}`);
       } catch (e) {
         console.error(`  [qual反馈] 写入失败: ${e.message}`);
       }
     }
   }
+  return { scopeIds, qualIds };
 }
 
 // === HTTP 抽象 ===
 
-async function callEndpoint(spec, base, pageOrId, size) {
+async function callEndpoint(spec, base, pageOrId, size, timeRange) {
   const url = `${base}${spec.path}`;
   const query = typeof spec.query === 'function'
-    ? spec.query(pageOrId, size)
+    ? spec.query(pageOrId, size, timeRange)
     : spec.query || null;
   const body = typeof spec.body === 'function'
-    ? spec.body(pageOrId, size)
+    ? spec.body(pageOrId, size, timeRange)
     : spec.body || null;
 
   const opts = { headers: spec.headers, timeout: 30000 };
@@ -240,8 +246,8 @@ function createPlatform({
 
   const inferScopeFn = inferScope || makeRegexInferScope(inferScopeRules);
 
-  async function fetchList(pageNum, pageSize) {
-    const res = await callEndpoint(http.list, http.base, pageNum, pageSize);
+  async function fetchList(pageNum, pageSize, timeRange) {
+    const res = await callEndpoint(http.list, http.base, pageNum, pageSize, timeRange);
     return http.list.unwrap(res);
   }
 
@@ -295,18 +301,57 @@ function createPlatform({
     return item;
   }
 
-  async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = null, scopeRules = null, uploadResults = null } = {}) {
-    console.log(`开始爬取 ${meta.name}: ${pageCount} 页 × ${pageSize} 条`);
+  async function run({ pageCount = 1, pageSize = 10, outputFile = null, onItem = null, scopeRules = null, uploadResults = null, timeRange = null, maxPages = 50 } = {}) {
+    const supportsTimeFilter = http.list.supportsTimeFilter !== false;
+    const maxPageCap = Math.max(pageCount, maxPages);
+
+    // watermark 兜底：仅在 list API 不支持时间过滤时启用
+    let watermarkId = null;
+    if (!supportsTimeFilter && meta.sourcePageId && timeRange) {
+      const wm = await getLastSeenAnnouncementForSource(meta.sourcePageId);
+      watermarkId = wm?.id || null;
+      if (watermarkId) {
+        console.log(`[watermark] ${meta.name} 上次已抓最新公告 ${watermarkId}，将分页直到命中`);
+      }
+    }
+
+    console.log(`开始爬取 ${meta.name}: ${maxPageCap} 页 × ${pageSize} 条 (time-filter=${supportsTimeFilter})`);
 
     const allItems = [];
-    for (let p = 1; p <= pageCount; p++) {
-      console.log(`\n--- 列表第 ${p}/${pageCount} 页 ---`);
-      const listData = await fetchList(p, pageSize);
+    let stopReason = 'max_pages';
+    let pageNum = 1;
+    while (pageNum <= maxPageCap) {
+      console.log(`\n--- 列表第 ${pageNum} 页 ---`);
+      const listData = await fetchList(pageNum, pageSize, timeRange);
       const records = listData.records || [];
       const total = listData.total ?? records.length;
       console.log(`  总数: ${total}, 当前页 ${records.length} 条`);
 
+      if (records.length === 0) {
+        stopReason = 'empty_page';
+        break;
+      }
+
+      let pageShouldStop = false;
       for (const r of records) {
+        if (watermarkId && r[http.list.idKey] === watermarkId) {
+          console.log(`  [watermark] 命中上次已抓记录 ${watermarkId}，停止分页`);
+          stopReason = 'watermark_hit';
+          pageShouldStop = true;
+          break;
+        }
+        if (!supportsTimeFilter && timeRange?.from) {
+          const pubStr = r.noticeStartDate || r.fbTime || r.startDate || r.inputDate;
+          if (pubStr) {
+            const pub = new Date(pubStr.replace(' ', 'T'));
+            if (!isNaN(pub.getTime()) && pub < timeRange.from) {
+              console.log(`  [time-window] 记录 ${r[http.list.idKey]} 早于 dateBegin，停止分页`);
+              stopReason = 'time_window_passed';
+              pageShouldStop = true;
+              break;
+            }
+          }
+        }
         try {
           const id = r[http.list.idKey];
           const record = await fetchDetail(id, r);
@@ -320,16 +365,24 @@ function createPlatform({
           console.error(`  ✗ ${label}: ${e.message}`);
         }
       }
+      if (pageShouldStop) break;
+      if (records.length < pageSize) {
+        stopReason = 'last_page';
+        break;
+      }
+      pageNum++;
     }
+
+    console.log(`\n[${meta.name}] 停止原因: ${stopReason}, 命中 ${allItems.length} 条`);
 
     if (outputFile) {
       const filePath = path.join(outputDir, outputFile);
       fs.writeFileSync(filePath, JSON.stringify(allItems, null, 2), 'utf-8');
-      console.log(`\n已保存 ${allItems.length} 条到 ${filePath}`);
+      console.log(`已保存 ${allItems.length} 条到 ${filePath}`);
     }
 
-    console.log(`\n爬取完成: ${allItems.length} 条`);
-    return { items: allItems, uploadResults };
+    console.log(`爬取完成: ${allItems.length} 条`);
+    return { items: allItems, uploadResults, stopReason };
   }
 
   function getWriteFeedbackLogs(meta) {

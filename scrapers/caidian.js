@@ -58,9 +58,14 @@ module.exports = createPlatform({
         type: '1', info: '0', pageNo: page, pageSize: size,
         timeStamp: '9s8K7_98L7m87-89k'
       }),
+      body: (page, size, tr) => ({
+        startDate: tr?.from ? tr.from.toISOString().slice(0, 10) : '',
+        endDate:   tr?.to   ? tr.to.toISOString().slice(0, 10)   : ''
+      }),
       headers: HEADERS,
       unwrap: r => ({ total: r.data?.count || 0, records: r.data?.list || [] }),
-      idKey: 'uuid'
+      idKey: 'uuid',
+      supportsTimeFilter: true
     },
     detail: {
       method: 'POST',

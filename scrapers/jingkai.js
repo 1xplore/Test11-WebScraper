@@ -53,7 +53,8 @@ module.exports = createPlatform({
       query: (page, size) => ({ type: '1', info: '0', pageNo: page, pageSize: size }),
       headers: HEADERS,
       unwrap: r => ({ total: r.data?.count || 0, records: r.data?.list || [] }),
-      idKey: 'uuid'
+      idKey: 'uuid',
+      supportsTimeFilter: false
     },
     detail: {
       method: 'POST',

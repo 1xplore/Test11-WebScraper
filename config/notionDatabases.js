@@ -62,6 +62,12 @@ const QUAL_RULES_DB = '3799e857b37a80f3b268e75a32c614b3';     // 招标线索资
 const SCOPE_ERROR_LOG_DB = '3799e857b37a804ab5a3e3522321d6a2'; // 招标线索业务匹配错误日志
 const QUAL_ERROR_LOG_DB = '3799e857b37a8021a15efeb99fd05c5b';  // 招标线索资质匹配错误日志
 
+// 抓取行为记录（每天 1 条，跨所有站点）
+const SCRAPE_LOG_DB = '37b9e857-b37a-80ed-aff0-fb7f95e68e4d';
+
+// 抓取日志在 4 个目标 DB 上自动生成的反向 relation 字段名（统一）
+const SCRAPE_LOG_RELATION_FIELD = '抓取统计记录';
+
 module.exports = {
   NOTION_TOKEN,
   NOTICE_DB,
@@ -70,4 +76,6 @@ module.exports = {
   QUAL_RULES_DB,
   SCOPE_ERROR_LOG_DB,
   QUAL_ERROR_LOG_DB,
+  SCRAPE_LOG_DB,
+  SCRAPE_LOG_RELATION_FIELD,
 };

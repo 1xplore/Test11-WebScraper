@@ -49,10 +49,12 @@ module.exports = createPlatform({
     list: {
       method: 'GET',
       path: '/czy-portal/content/indexAnnouncementMore',
-      query: (page, size) => ({
+      query: (page, size, tr) => ({
         page, pageSize: size, info: '0', tenantCode: TENANT_CODE,
         articleName: '', planId: '', cgrName: '', itemName: '',
-        stockWay: '', startDate: '', endDate: ''
+        stockWay: '',
+        startDate: tr?.from ? tr.from.toISOString().slice(0, 10) : '',
+        endDate:   tr?.to   ? tr.to.toISOString().slice(0, 10)   : ''
       }),
       headers: HEADERS,
       unwrap: r => {
@@ -60,7 +62,8 @@ module.exports = createPlatform({
         if (!body?.success) throw new Error(`列表 API 返回错误: ${body?.msg || r.head?.msg}`);
         return { total: body.data?.total || 0, records: body.data?.list || [] };
       },
-      idKey: 'uuid'
+      idKey: 'uuid',
+      supportsTimeFilter: true
     },
     detail: {
       method: 'GET',
