@@ -12,6 +12,7 @@
  *   - 详情 URL 需要 id + registrationId 双参
  */
 const { createPlatform, extractDistrict } = require('./platform');
+const { SOURCE_PAGES } = require('../config/notionDatabases');
 
 const BASE = 'https://www.whzbtbxt.cn/whebd-server';
 const HEADERS = {
@@ -98,7 +99,7 @@ module.exports = createPlatform({
   meta: {
     name: '武汉市公共资源交易平台招投标系统',
     homepage: 'https://www.whzbtbxt.cn/',
-    sourcePageId: null,  // whzbtbxt 已切换纯 API，无需 sourcePageId
+    sourcePageId: SOURCE_PAGES.whzbtbxt,
     scriptId: 'wuhan_public'
   },
   http: {

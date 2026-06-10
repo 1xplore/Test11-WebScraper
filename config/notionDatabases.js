@@ -35,6 +35,7 @@ const NOTICE_DB = '32d9e857b37a80f8bfdad0de856ee030';
 
 // 平台配置（各 scraper 的 sourcePageId 使用）
 const SOURCE_PAGES = {
+  whzbtbxt: '32d9e857-b37a-81c6-948b-f10412e25db3',
   dongxihu: '32d9e857-b37a-81bf-9976-c49aa0e892aa',
   huangpi: '32d9e857-b37a-8138-9649-cf435a5d3ffa',
   caidian: '32d9e857-b37a-818c-9196-d04116a5114f',
