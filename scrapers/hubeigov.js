@@ -1,7 +1,7 @@
 /**
  * 湖北省政府采购网 爬虫
  *
- * 站点: https://www.ccgp-hubei.gov.cn/ (纯静态 HTML，无 API)
+ * 站点: http://www.ccgp-hubei.gov.cn/ (纯静态 HTML，无 API)
  * 列表: GET /notice/cggg/pzbgg/index_{N}.html       — 采购公告频道
  * 详情: GET <相对 href，来自列表 a@href>
  *
@@ -12,17 +12,19 @@
  *   - 全省公告全量抓取；标题含"武汉"或区名时 district 优先显示该区，否则 '湖北省'
  *   - 详情正文在 .art_con 下；第一个子 div 是 meta 行（发布日期/单位/截止）
  *     剩余 children 是正文；按 parseHtmlContent 的纯文本正则提取字段
+ *   - **走 HTTP 而非 HTTPS**：该站 HTTPS 端口被 WAF 速率限制（TCP 443 静默 drop，
+ *     间歇性恢复），而 HTTP 端口 80 不受影响。2026-06-11 验证：HTTP 0.2s 稳定 200
  */
 const cheerio = require('cheerio');
 const { createPlatform, extractDistrict } = require('./platform');
 const { SOURCE_PAGES } = require('../config/notionDatabases');
 
-const BASE = 'https://www.ccgp-hubei.gov.cn';
+const BASE = 'http://www.ccgp-hubei.gov.cn';
 const CHANNEL = 'pzbgg'; // 采购公告（招标/磋商/谈判/竞争性磋商混合频道）
 const HEADERS = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-  'Referer': 'https://www.ccgp-hubei.gov.cn/'
+  'Referer': 'http://www.ccgp-hubei.gov.cn/'
 };
 
 const HUBEIGOV_SCOPE_RULES = [

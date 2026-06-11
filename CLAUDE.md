@@ -170,3 +170,47 @@ ssh admin@47.122.112.224 \
 - **资质错误日志原文**：`extractQualSection()` 从正文截取"本项目的特定资格要求："到"三、"之间段落，作为反馈日志的"原始文本"
 - **频率限制**：东西湖/黄陂 API 详情请求间隔 ≥300ms，避免触发限流
 - **cron 启停控制**：`main.js --all` 仅跑 Notion `是否启用抓取 = 已配置运行中` 的平台；用户改状态后下一次 cron 即生效。新增平台后必须主动把状态置为 `已配置运行中`，否则会被静默跳过。Notion 不可达时降级到 `data/enabledSourcesCache.json` 缓存（与 `scopeRules` 同模式）。
+
+## 网络/连接问题诊断套路
+
+**症状**：scraper 报 "Connection timed out" / "ECONNRESET" / "status code 0"
+
+**先做这 3 步定位**（在服务器 `47.122.112.224` 上）：
+
+```bash
+# 1. 测 ICMP（确认网络层通）
+ping -c 2 <IP>
+
+# 2. 测 TCP 443（HTTPS 默认）
+curl -4 -sS -m 5 -o /dev/null -w '%{http_code}|%{time_total}\n' https://<host>/
+
+# 3. 测 TCP 80（HTTP 备用）
+curl -4 -sS -m 5 -o /dev/null -w '%{http_code}|%{time_total}\n' http://<host>/
+```
+
+**关键诊断表**：
+
+| ICMP | TCP 443 | TCP 80 | 含义 | 处理 |
+|---|---|---|---|---|
+| ✓ | 200/3xx | 200/3xx | 完全正常 | - |
+| ✓ | timeout | 200 | **HTTPS WAF 静默限流** | 改 scraper `BASE` 为 `http://`（典型：hubeigov, 2026-06-11） |
+| ✓ | timeout | timeout | IP 段 / 路由黑洞 | 改 scraper 标 `访问受限故停用`（典型：xzqjyzx） |
+| ✗ | timeout | timeout | 真网络不可达 | 检查服务器自身网络 / 防火墙 |
+| ✓ | 200 短时 | timeout | WAF 限流 (443 only) | 等几分钟重试；或按上 2 改 HTTP |
+
+**HTTPS WAF 静默 drop 识别**：
+- ICMP 通，TCP 443 不返 SYN/ACK（curl 等 5-30s timeout，**不返 RST**）
+- 间歇性：通几分钟 → 静默 ban 几分钟 → 释放 → 重复
+- 同一 IP 段多个站都表现相同（典型：湖北武汉电信/移动的政府采购类站）
+- 不是"被我们访问量风控"：scraper 每天 1 次，频率不足以触发；本地从未访问的 IP 也不通
+
+**修复套路**（hubeigov 案例）：
+1. 改 `scrapers/<site>.js` 的 `const BASE = 'https://...'` → `http://...`
+2. 同步改 HEADERS 里 `Referer: 'https://...'` → `http://...`
+3. `meta.homepage` 是仅展示用，保留 https 即可
+4. 重新本地 + 服务器端到端验证
+
+**遇到 IP 段黑洞**（xzqjyzx 案例）：
+- 标 `访问受限故停用`，cron 自动跳过
+- 救活方案：武汉本地中转代理（运维成本高）
+- 保留 scraper 代码，状态改回 `已配置运行中` 即可恢复
