@@ -112,7 +112,7 @@ async function createScrapeLog({
 }) {
   const timeLabel = scrapeTime.toISOString().slice(0, 16).replace('T', ' ');
   const properties = {
-    'Name': { title: [{ type: 'text', text: { content: `抓取统计 ${timeLabel}` } }] },
+    '抓取记录': { title: [{ type: 'text', text: { content: `抓取统计 ${timeLabel}` } }] },
     '抓取时间': { date: { start: scrapeTime.toISOString() } },
     '抓取时间窗口开始': { date: { start: dateBegin.toISOString() } },
     '抓取时间窗口结束': { date: { start: dateEnd.toISOString() } },
