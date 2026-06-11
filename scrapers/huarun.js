@@ -21,6 +21,7 @@ const axios = require('axios');
 const cheerio = require('cheerio');
 const fs = require('fs');
 const path = require('path');
+const { execFile } = require('child_process');
 const notion = require('../utils/notion');
 const { SOURCE_PAGES } = require('../config/notionDatabases');
 const { IN_SCOPE, OUT_OF_SCOPE, extractDistrict, parseDate } = require('./platform');
@@ -31,11 +32,28 @@ const CHANNELS = [
   { id: 26915, name: '采购公告', referer: `${BASE}/first_cggg/index.html` },
 ];
 const REGION_KEYWORDS = ['武汉', '湖北'];
-const HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-  'Accept': 'application/json, text/plain, */*',
-  'Accept-Language': 'zh-CN,zh;q=0.9',
-};
+
+/**
+ * 用 curl 而非 axios/https：EdgeOne WAF 对 Node.js 的 TLS 指纹（JA3）返回 567，
+ * 但对 curl 放行。绕路最直接：shell out curl。
+ *   - 列表 API 用 curl 走 JSON
+ *   - 详情 HTML 用 curl 走 text
+ */
+function curlGet(url, { referer, accept = '*/*' } = {}) {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-sS', '-L', '--max-time', '30',
+      '-H', `Accept: ${accept}`,
+      '-H', 'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    ];
+    if (referer) args.push('-H', `Referer: ${referer}`);
+    args.push(url);
+    execFile('/usr/bin/curl', args, (err, stdout, stderr) => {
+      if (err) return reject(new Error(`curl ${url} failed: ${err.message} ${stderr || ''}`));
+      resolve(stdout);
+    });
+  });
+}
 
 const HUARUN_SCOPE_RULES = [
   { regex: /EPC|设计施工总承包|设计采购施工|交钥匙/, tag: 'EPC', stopOnMatch: true },
@@ -112,28 +130,24 @@ function mapListItem(item, channelName) {
 
 async function fetchListPage(channel, pageNo, pageSize) {
   const url = `${BASE}/rcms-external-rest/content/getSZExtData?channelIds=${channel.id}&pageNo=${pageNo}&pageSize=${pageSize}`;
-  const res = await axios.get(url, {
-    headers: { ...HEADERS, Referer: channel.referer },
-    timeout: 30000,
-  });
-  if (res.data?.code !== 'S1A00000') {
-    throw new Error(`列表 API 返回错误: ${res.data?.msg || 'unknown'}`);
+  const body = await curlGet(url, { referer: channel.referer, accept: 'application/json, text/plain, */*' });
+  let res;
+  try { res = JSON.parse(body); } catch (e) { throw new Error(`列表 API 返回非 JSON: ${body.slice(0, 200)}`); }
+  if (res.code !== 'S1A00000') {
+    throw new Error(`列表 API 返回错误: ${res.msg || 'unknown'}`);
   }
-  return res.data.data; // { pageNo, pageSize, totalCount, data: [...] }
+  return res.data; // { pageNo, pageSize, totalCount, data: [...] }
 }
 
 async function fetchDetail(record) {
-  const res = await axios.get(record.detailUrl, {
-    headers: { ...HEADERS, Referer: `${BASE}/`, Accept: 'text/html,application/xhtml+xml,*/*' },
-    timeout: 30000,
-  });
-  return parseDetail(res.data, record);
+  const html = await curlGet(record.detailUrl, { referer: `${BASE}/`, accept: 'text/html,application/xhtml+xml,*/*' });
+  return parseDetail(html, record);
 }
 
 function parseDetail(html, listRecord) {
   const $ = cheerio.load(html);
-  // 抠出含公告正文的 div：优先级 .news-content / .article-content / .detail-content / .content
-  let $content = $('.news-content, .article-content, .detail-content, .content, [class*="news-article"]').first();
+  // 抠出含公告正文的 div：szb-* 系列；退回最长的"含公告关键词"的 div
+  let $content = $('.szb-content-item, .szb-content, .szb-detailMain, .szb-detail').first();
   if ($content.length === 0) {
     let best = null, bestLen = 0;
     $('div').each((_, el) => {
@@ -249,7 +263,10 @@ async function run({ pageCount = 2, pageSize = 20, outputFile = null, timeRange 
       }
       if (items.length < pageSize) break;
       if (!allBefore) break;
+      // WAF 友好：分页/通道间停顿（EdgeOne 对突发请求敏感）
+      await new Promise(r => setTimeout(r, 1000));
     }
+    await new Promise(r => setTimeout(r, 1500));
   }
 
   console.log(`\n[华润守正] 湖北/武汉相关 ${filtered.length} 条，开始拉详情`);
