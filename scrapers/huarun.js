@@ -92,7 +92,7 @@ function isWuhanHubei(item) {
 }
 
 function detectNoticeType(title) {
-  if (/资格预审/.test(title)) return '资格预审公告';
+  if (/资格预审|资审/.test(title)) return '资格预审公告';
   if (/招标公告/.test(title)) return '招标公告';
   if (/采购公告/.test(title)) return '采购公告';
   if (/更正公告/.test(title)) return '更正公告';
