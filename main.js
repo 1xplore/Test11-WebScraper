@@ -39,6 +39,7 @@ const wuchangScraper = require('./scrapers/wuchang');
 const hubeigovScraper = require('./scrapers/hubeigov');
 const notion = require('./utils/notion');
 const { getScopeRules } = require('./utils/notionScopeRules');
+const { getEnabledSourceScriptIds } = require('./utils/sourceConfig');
 const { getLastScrapeTime, createScrapeLog } = require('./utils/scrapeLog');
 const { SOURCE_PAGES } = require('./config/notionDatabases');
 
@@ -133,8 +134,24 @@ async function runAll(opts) {
   const timeRange = await resolveTimeRange(opts.sinceDays);
   console.log(`\n时间窗: ${timeRange.from.toISOString()} ~ ${timeRange.to.toISOString()} (${timeRange.hasHistory ? '有历史' : `首次回溯 ${opts.sinceDays} 天`})`);
 
-  const allResults = [];
+  const enabledIds = await getEnabledSourceScriptIds();
+  const enabledEntries = [];
   for (const [key, scraper] of Object.entries(SCRAPERS)) {
+    const sid = scraper.meta?.scriptId;
+    if (!sid) {
+      console.warn(`[${key}] 缺少 meta.scriptId，跳过`);
+      continue;
+    }
+    if (!enabledIds.has(sid)) {
+      console.log(`[${key}] Notion 状态非"已配置运行中"，跳过 (scriptId=${sid})`);
+      continue;
+    }
+    enabledEntries.push([key, scraper]);
+  }
+  console.log(`\n启用 ${enabledEntries.length} 个 / 跳过 ${Object.keys(SCRAPERS).length - enabledEntries.length} 个`);
+
+  const allResults = [];
+  for (const [key, scraper] of enabledEntries) {
     try {
       const r = await runScraper(scraper, opts, timeRange, scopeRules);
       allResults.push({ site: key, ...r });
@@ -144,9 +161,11 @@ async function runAll(opts) {
     }
   }
 
-  if (opts.upload) {
+  if (opts.upload && allResults.length > 0) {
     const { touchedIds, scopeIds, qualIds } = collectPageIds(allResults);
-    const platformIds = Object.values(SOURCE_PAGES);
+    const platformIds = enabledEntries
+      .map(([, s]) => s.meta?.sourcePageId)
+      .filter(Boolean);
     await createScrapeLog({
       scrapeTime: new Date(),
       dateBegin: timeRange.from,
@@ -185,7 +204,6 @@ async function main() {
   };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--all') continue;
-    if (runAllFlag && !targetSite) continue;
     if (args[i] === '--pages') opts.pageCount = parseInt(args[++i], 10);
     else if (args[i] === '--size') opts.pageSize = parseInt(args[++i], 10);
     else if (args[i] === '--no-upload') opts.upload = false;

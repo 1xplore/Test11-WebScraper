@@ -33,6 +33,9 @@ const NOTION_TOKEN = process.env.NOTION_TOKEN;
 // 主数据库
 const NOTICE_DB = '32d9e857b37a80f8bfdad0de856ee030';
 
+// 来源数据库（每条记录 = 一个抓取平台）
+const SOURCE_DB = '32d9e857b37a80d7ad08d8e7e1c81620';
+
 // 平台配置（各 scraper 的 sourcePageId 使用）
 const SOURCE_PAGES = {
   whzbtbxt: '32d9e857-b37a-81c6-948b-f10412e25db3',
@@ -73,6 +76,7 @@ const SCRAPE_LOG_RELATION_FIELD = '抓取统计记录';
 module.exports = {
   NOTION_TOKEN,
   NOTICE_DB,
+  SOURCE_DB,
   SOURCE_PAGES,
   SCOPE_RULES_DB,
   QUAL_RULES_DB,

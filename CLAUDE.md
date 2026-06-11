@@ -157,8 +157,11 @@ ssh admin@47.122.112.224 \
 1. 在 `scrapers/` 下创建 `<sitename>.js`，导出 `{ run, mapToNotion, meta }`
 2. 在 `main.js` 的 `SCRAPERS` 字典注册
 3. 在招标线索来源数据库登记 sourcePageId
-4. 重新打包部署到服务器
-5. 测试: `node main.js <sitename> --pages 1 --size 5`
+4. **在 Notion 来源库把 `是否启用抓取` 置为 `已配置运行中`**——否则 cron 会跳过该平台（`--all` 走 `utils/sourceConfig.js` 过滤）
+5. 重新打包部署到服务器
+6. 测试: `node main.js <sitename> --pages 1 --size 5`
+
+> 站点被禁用场景：把 Notion 状态改为 `访问受限故停用`（服务器连不通）/ `已配置但停用`（临时关闭）/ `有错误`（代码或上游异常），cron 都会自动跳过，**不需要从 main.js 移除 scraper**。单站手动运行 `node main.js <site>` 不过滤，仍能跑（用于本地调试被禁站点）。
 
 ## 关键约束
 
@@ -166,3 +169,4 @@ ssh admin@47.122.112.224 \
 - **资质字段**：东西湖/黄陂大多数公告无特定资质要求；少数有资质要求的格式为"XX级资质（行业限定）"
 - **资质错误日志原文**：`extractQualSection()` 从正文截取"本项目的特定资格要求："到"三、"之间段落，作为反馈日志的"原始文本"
 - **频率限制**：东西湖/黄陂 API 详情请求间隔 ≥300ms，避免触发限流
+- **cron 启停控制**：`main.js --all` 仅跑 Notion `是否启用抓取 = 已配置运行中` 的平台；用户改状态后下一次 cron 即生效。新增平台后必须主动把状态置为 `已配置运行中`，否则会被静默跳过。Notion 不可达时降级到 `data/enabledSourcesCache.json` 缓存（与 `scopeRules` 同模式）。
