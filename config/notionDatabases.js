@@ -58,6 +58,7 @@ const SOURCE_PAGES = {
   wuchang: '32d9e857-b37a-8151-b58d-fd92c305f85b',
   hubeigov: '32d9e857-b37a-818a-8961-fea67ae05d5e',
   huarun: '32d9e857-b37a-810c-9701-c518b894127d',
+  dongfeng: '37c9e857-b37a-80dc-a1af-cac998d74184',
 };
 
 // 规则库（人类可编辑，爬虫每日同步）

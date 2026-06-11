@@ -38,6 +38,7 @@ const jianghanScraper = require('./scrapers/jianghan');
 const wuchangScraper = require('./scrapers/wuchang');
 const hubeigovScraper = require('./scrapers/hubeigov');
 const huarunScraper = require('./scrapers/huarun');
+const dongfengScraper = require('./scrapers/dongfeng');
 const notion = require('./utils/notion');
 const { getScopeRules } = require('./utils/notionScopeRules');
 const { getEnabledSourceScriptIds } = require('./utils/sourceConfig');
@@ -66,7 +67,8 @@ const SCRAPERS = {
   jianghan: jianghanScraper,
   wuchang: wuchangScraper,
   hubeigov: hubeigovScraper,
-  huarun: huarunScraper
+  huarun: huarunScraper,
+  dongfeng: dongfengScraper
 };
 
 /**
