@@ -149,3 +149,15 @@ CREATE TABLE IF NOT EXISTS scrape_runs (
 );
 
 CREATE INDEX IF NOT EXISTS idx_runs_scrape_time ON scrape_runs(scrape_time DESC);
+
+-- ---------- 用户（最简版：用户名 + token，无密码） ----------
+CREATE TABLE IF NOT EXISTS users (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  username        TEXT    UNIQUE NOT NULL,
+  display_name    TEXT,
+  token           TEXT    UNIQUE NOT NULL,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  last_seen_at    TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_users_token ON users(token);

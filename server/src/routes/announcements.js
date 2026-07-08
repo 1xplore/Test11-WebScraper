@@ -12,7 +12,7 @@ router.get('/', (req, res) => {
   const {
     q, businessMatch, reviewStatus, progress, platformId, scopeTag, district,
     minContractPrice, maxContractPrice, dateFrom, dateTo,
-    sortBy, sortDir, page, pageSize,
+    sortBy, sortDir, page, pageSize, format,
   } = req.query;
   const result = storage.listAnnouncements({
     q: q || null,
@@ -29,8 +29,31 @@ router.get('/', (req, res) => {
     sortBy: sortBy || 'notice_start_date',
     sortDir: sortDir || 'DESC',
     page: page ? parseInt(page, 10) : 1,
-    pageSize: pageSize ? parseInt(pageSize, 10) : 50,
+    pageSize: format === 'csv' ? 10000 : (pageSize ? parseInt(pageSize, 10) : 50),
   });
+
+  if (format === 'csv') {
+    const headers = [
+      'id', 'title', 'notice_id', 'project_code', 'notice_type',
+      'notice_start_date', 'notice_end_date', 'bid_submit_deadline',
+      'publicity_date', 'result_date', 'district', 'tender_corp', 'agency_corp',
+      'contract_price', 'offer_price', 'tender_bond', 'total_investment',
+      'description', 'requirement', 'business_match', 'project_progress',
+      'match_score', 'review_status', 'review_note', 'detail_url',
+    ];
+    const rows = result.items.map((i) => headers.map((h) => {
+      let v = i[h];
+      if (Array.isArray(v)) v = v.join('、');
+      if (v == null) return '';
+      const s = String(v).replace(/"/g, '""').replace(/\n/g, ' ');
+      return /[,"\n]/.test(s) ? `"${s}"` : s;
+    }).join(','));
+    const csv = '﻿' + [headers.join(','), ...rows].join('\n');
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="announcements-${new Date().toISOString().slice(0, 10)}.csv"`);
+    return res.send(csv);
+  }
+
   res.json(result);
 });
 
@@ -41,14 +64,23 @@ router.get('/:id', (req, res) => {
   res.json(item);
 });
 
-// PATCH /api/announcements/:id/review  body: { reviewStatus, reviewNote, reviewedBy }
+// PATCH /api/announcements/:id/review  body: { reviewStatus, reviewNote, reviewedBy? }
 router.patch('/:id/review', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { reviewStatus, reviewNote, reviewedBy } = req.body || {};
-  const updated = storage.patchAnnouncementReview(id, { reviewStatus, reviewNote, reviewedBy });
+  // 如果未传 reviewedBy，从 token 反查
+  const finalReviewedBy = reviewedBy || resolveUserFromToken(req)?.username || 'me';
+  const updated = storage.patchAnnouncementReview(id, { reviewStatus, reviewNote, reviewedBy: finalReviewedBy });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.json(updated);
 });
+
+function resolveUserFromToken(req) {
+  const h = req.headers.authorization || '';
+  if (!h.startsWith('Bearer ')) return null;
+  const storage = require('../storage/adapter');
+  return storage.getUserByToken(h.slice(7).trim());
+}
 
 // POST /api/announcements/:id/reviewed   标记已审核
 router.post('/:id/reviewed', (req, res) => {

@@ -6,7 +6,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { fetcher, fmt } from '@/lib/api';
+import { fetcher, fmt, auth } from '@/lib/api';
 
 const REVIEW_OPTIONS = ['A.未关注', 'A.关注中', 'H.已投标', 'X.已放弃', 'Y.未中标', 'Z.已中标'];
 
@@ -61,10 +61,11 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
     if (!item || saving) return;
     setSaving(true);
     try {
+      const user = auth.getUser();
       const updated = await fetcher.patchReview(item.id, {
         reviewNote,
         reviewStatus: item.review_status,
-        reviewedBy: 'me',
+        reviewedBy: user?.username,
       });
       setItem(updated);
       onChanged?.(updated);

@@ -241,6 +241,49 @@ function writeQualErrorLog(announcementId, rawText) {
   ).run(announcementId, rawText).lastInsertRowid;
 }
 
+function listScopeErrorLogs({ resolved = null, limit = 50 } = {}) {
+  const where = [];
+  const params = [];
+  if (resolved !== null) { where.push('resolved = ?'); params.push(resolved ? 1 : 0); }
+  const sql = `
+    SELECT sel.*, a.title AS announcement_title, a.business_match
+    FROM scope_error_logs sel
+    LEFT JOIN announcements a ON a.id = sel.announcement_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY sel.created_at DESC LIMIT ?`;
+  return db.prepare(sql).all(...params, limit);
+}
+
+function listQualErrorLogs({ resolved = null, limit = 50 } = {}) {
+  const where = [];
+  const params = [];
+  if (resolved !== null) { where.push('resolved = ?'); params.push(resolved ? 1 : 0); }
+  const sql = `
+    SELECT qel.*, a.title AS announcement_title
+    FROM qual_error_logs qel
+    LEFT JOIN announcements a ON a.id = qel.announcement_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY qel.created_at DESC LIMIT ?`;
+  return db.prepare(sql).all(...params, limit);
+}
+
+function resolveScopeError(id, { ruleId, tag } = {}) {
+  db.prepare(
+    `UPDATE scope_error_logs SET resolved = 1, resolved_rule_id = ?, resolved_tag = ?
+     WHERE id = ?`
+  ).run(ruleId || null, tag || null, id);
+  return db.prepare('SELECT * FROM scope_error_logs WHERE id = ?').get(id);
+}
+
+function getErrorLogCounts() {
+  return {
+    scope_unresolved: db.prepare('SELECT COUNT(*) AS n FROM scope_error_logs WHERE resolved = 0').get().n,
+    scope_total: db.prepare('SELECT COUNT(*) AS n FROM scope_error_logs').get().n,
+    qual_unresolved: db.prepare('SELECT COUNT(*) AS n FROM qual_error_logs WHERE resolved = 0').get().n,
+    qual_total: db.prepare('SELECT COUNT(*) AS n FROM qual_error_logs').get().n,
+  };
+}
+
 /**
  * 批量写反馈日志（按 item + result）
  * @returns { scopeIds: number[], qualIds: number[] }
@@ -298,7 +341,9 @@ function createScopeRule({ priority, tag, keywords, stop_on_match = 0, enabled =
 
 function getLastScrapeTime() {
   const row = db.prepare('SELECT scrape_time FROM scrape_runs ORDER BY scrape_time DESC LIMIT 1').get();
-  return row ? new Date(row.scrape_time.replace(' ', 'T') + 'Z') : null;
+  if (!row) return null;
+  const t = new Date(row.scrape_time);
+  return isNaN(t.getTime()) ? null : t;
 }
 
 function createScrapeRun({ scrapeTime, dateBegin, dateEnd, platformIds, announcementIds, scopeErrorIds, qualErrorIds, stats }) {
@@ -325,6 +370,30 @@ function createScrapeRun({ scrapeTime, dateBegin, dateEnd, platformIds, announce
 
 function listScrapeRuns({ limit = 30 } = {}) {
   return db.prepare('SELECT * FROM scrape_runs ORDER BY scrape_time DESC LIMIT ?').all(limit);
+}
+
+// ---------- users（最简版：用户名 + token，无密码） ----------
+function findOrCreateUser(username, displayName = null) {
+  let user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  if (user) {
+    db.prepare('UPDATE users SET last_seen_at = datetime(\'now\') WHERE id = ?').run(user.id);
+    return user;
+  }
+  const token = `tok_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  const info = db.prepare(
+    'INSERT INTO users (username, display_name, token) VALUES (?, ?, ?)'
+  ).run(username, displayName || username, token);
+  user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
+  return user;
+}
+
+function getUserByToken(token) {
+  if (!token) return null;
+  return db.prepare('SELECT * FROM users WHERE token = ?').get(token);
+}
+
+function listUsers() {
+  return db.prepare('SELECT id, username, display_name, created_at, last_seen_at FROM users ORDER BY id').all();
 }
 
 // ---------- 统计 ----------
@@ -369,10 +438,13 @@ module.exports = {
   patchAnnouncementReview, markReviewed,
   // feedback logs
   writeScopeErrorLog, writeQualErrorLog, writeFeedbackLogs,
+  listScopeErrorLogs, listQualErrorLogs, resolveScopeError, getErrorLogCounts,
   // scope rules
   listScopeRules, patchScopeRule, createScopeRule,
   // scrape runs
   getLastScrapeTime, createScrapeRun, listScrapeRuns,
+  // users
+  findOrCreateUser, getUserByToken, listUsers,
   // stats
   getStats,
   // util

@@ -1,12 +1,14 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Bell, Settings2, Activity, Boxes } from 'lucide-react';
+import { Bell, Settings2, Activity, Boxes, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import Login from '@/components/Login.jsx';
 
 const navItems = [
   { to: '/', label: '招标线索', icon: Boxes, end: true },
   { to: '/platforms', label: '抓取来源', icon: Settings2 },
   { to: '/scope-rules', label: '匹配规则', icon: Activity },
+  { to: '/error-logs', label: '错误日志', icon: AlertTriangle },
   { to: '/scrape-runs', label: '抓取日志', icon: Bell },
 ];
 
@@ -38,6 +40,9 @@ export default function AppShell() {
               </NavLink>
             ))}
           </nav>
+          <div className="border-l border-[#e6e6e6] pl-4 ml-1">
+            <Login />
+          </div>
         </div>
       </header>
       <main className="flex-1">

@@ -17,6 +17,9 @@ const annRouter = require('./routes/announcements');
 const platRouter = require('./routes/platforms');
 const scopeRouter = require('./routes/scope-rules');
 const runsRouter = require('./routes/scrape-runs');
+const errLogsRouter = require('./routes/error-logs');
+const triggerRouter = require('./routes/scrape-trigger');
+const authRouter = require('./routes/auth');
 const matching = require('./services/matching');
 
 const app = express();
@@ -47,6 +50,9 @@ app.use('/api/announcements', annRouter);
 app.use('/api/platforms', platRouter);
 app.use('/api/scope-rules', scopeRouter);
 app.use('/api/scrape-runs', runsRouter);
+app.use('/api/error-logs', errLogsRouter);
+app.use('/api/scrape-trigger', triggerRouter);
+app.use('/api/auth', authRouter);
 
 app.use((err, req, res, next) => {
   console.error('[api error]', err);

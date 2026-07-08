@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Power, AlertTriangle, RefreshCw } from 'lucide-react';
+import { Power, AlertTriangle, RefreshCw, Play, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { fetcher, fmt } from '@/lib/api';
@@ -11,10 +11,20 @@ const STATUS_VARIANT = {
   '已配置但停用': 'muted',
 };
 
+// scraper.site_key 映射（与 server/src/routes/scrape-trigger.js ALLOWED_SITES 一致）
+const SITE_KEYS = [
+  'whzbtbxt', 'whzfcgxt', 'dongxihu', 'huangpi', 'caidian', 'jingkai',
+  'changjiangxinqu', 'xinzhou', 'qingshan', 'hongshan', 'donghuwx',
+  'qiaokou', 'hanyang', 'donghu', 'jiangxia', 'jiangan', 'jianghan',
+  'wuchang', 'hubeigov', 'huarun', 'dongfeng',
+];
+
 export default function Platforms() {
   const [list, setList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(null);
+  const [triggering, setTriggering] = useState(null); // { scriptId, taskId, status }
+  const [tasks, setTasks] = useState([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -26,7 +36,46 @@ export default function Platforms() {
     }
   }, []);
 
+  const loadTasks = useCallback(async () => {
+    try {
+      const data = await fetcher.listTriggerTasks();
+      setTasks(data);
+    } catch {}
+  }, []);
+
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { loadTasks(); const t = setInterval(loadTasks, 2000); return () => clearInterval(t); }, [loadTasks]);
+
+  function siteKeyFor(p) {
+    // script_id 转 site_key（去掉 _district 后缀 → 取首段作为 key）
+    // 例如 'wuhan_dongxihu_district' → 'dongxihu'?  但 main.js 里 site 是 dongxihu，不是 wuhan_dongxihu
+    // 我们的 scraper site key 列表（SITE_KEYS）跟 platforms.script_id 不一定一一对应
+    // 简单方案：人工映射（script_id → site_key）
+    const map = {
+      'wuhan_public': 'whzbtbxt',
+      'wuhan_zhongcai': 'whzfcgxt',
+      'wuhan_dongxihu_district': 'dongxihu',
+      'wuhan_huangpi_district': 'huangpi',
+      'wuhan_caidian_district': 'caidian',
+      'wuhan_jingkai_district': 'jingkai',
+      'wuhan_changjiangxinqu_district': 'changjiangxinqu',
+      'wuhan_xinzhou_district': 'xinzhou',
+      'wuhan_qingshan_district': 'qingshan',
+      'wuhan_hongshan_district': 'hongshan',
+      'wuhan_donghuwx_district': 'donghuwx',
+      'wuhan_qiaokou_district': 'qiaokou',
+      'wuhan_hanyang_district': 'hanyang',
+      'wuhan_donghu_district': 'donghu',
+      'wuhan_jiangxia_district': 'jiangxia',
+      'wuhan_jiangan_district': 'jiangan',
+      'wuhan_jianghan_district': 'jianghan',
+      'wuhan_wuchang_district': 'wuchang',
+      'hubei_gov': 'hubeigov',
+      'huarun': 'huarun',
+      'dongfeng': 'dongfeng',
+    };
+    return map[p.script_id] || null;
+  }
 
   async function toggle(p) {
     if (busy) return;
@@ -48,6 +97,22 @@ export default function Platforms() {
       await load();
     } finally {
       setBusy(null);
+    }
+  }
+
+  async function trigger(p, pages = 1, size = 10) {
+    const siteKey = siteKeyFor(p);
+    if (!siteKey) {
+      alert(`找不到 platform ${p.script_id} 对应的 scraper site key`);
+      return;
+    }
+    setTriggering({ scriptId: p.script_id, status: 'starting' });
+    try {
+      const r = await fetcher.triggerScrape({ site: siteKey, pages, size });
+      setTriggering({ scriptId: p.script_id, taskId: r.task_id, status: 'running' });
+    } catch (e) {
+      setTriggering({ scriptId: p.script_id, status: 'error', error: e.message });
+      setTimeout(() => setTriggering(null), 3000);
     }
   }
 
@@ -91,10 +156,17 @@ export default function Platforms() {
                   {p.last_error}
                 </div>
               )}
-              <div className="flex gap-2 mt-auto">
+              <div className="flex gap-2 mt-auto flex-wrap">
                 <Button size="sm" variant={p.status === '已配置运行中' ? 'outline' : 'default'} onClick={() => toggle(p)} disabled={busy === p.id}>
                   <Power className="h-3.5 w-3.5" />
                   {p.status === '已配置运行中' ? '停用' : '启用'}
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => trigger(p, 1, 10)} disabled={busy === p.id || (triggering?.scriptId === p.script_id && triggering?.status === 'running')}>
+                  {triggering?.scriptId === p.script_id && triggering?.status === 'running' ? (
+                    <><Loader2 className="h-3.5 w-3.5 animate-spin" />运行中</>
+                  ) : (
+                    <><Play className="h-3.5 w-3.5" />立即抓取</>
+                  )}
                 </Button>
                 {p.status !== '有错误' && (
                   <Button size="sm" variant="ghost" onClick={() => markError(p)} disabled={busy === p.id}>
@@ -103,6 +175,11 @@ export default function Platforms() {
                   </Button>
                 )}
               </div>
+              {triggering?.scriptId === p.script_id && (
+                <div className={`text-xs mt-2 px-2 py-1 rounded ${triggering.status === 'error' ? 'bg-[#fce4e4] text-[#c63838]' : 'bg-[#e0eaff] text-[#1e40af]'}`}>
+                  {triggering.status === 'error' ? `✗ ${triggering.error}` : '✓ 已触发，2 秒后看 scrape-runs 页面'}
+                </div>
+              )}
             </div>
           ))}
         </div>

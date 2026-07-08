@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { RefreshCw, ArrowUpDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Download } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import StatStrip from '@/components/StatStrip.jsx';
 import FilterBar from '@/components/FilterBar.jsx';
@@ -87,6 +88,14 @@ export default function Dashboard() {
               ))}
             </SelectContent>
           </Select>
+          <a
+            href={fetcher.exportCsvUrl(filters)}
+            download
+            className="inline-flex items-center gap-1 h-8 px-3 text-xs font-medium rounded-md border border-[#e6e6e6] bg-white text-slate-700 hover:bg-[#f6f5f4]"
+          >
+            <Download className="h-3.5 w-3.5" />
+            导出 CSV
+          </a>
           <Button size="sm" variant="ghost" onClick={fetchAll} disabled={loading}>
             <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
             刷新

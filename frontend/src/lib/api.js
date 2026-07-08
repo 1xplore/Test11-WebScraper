@@ -6,6 +6,26 @@ const api = axios.create({
   timeout: 30000,
 });
 
+// 自动带 token
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('bidintel_token');
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
+
+export const auth = {
+  login: (username) => api.post('/auth/login', { username }).then((r) => r.data),
+  me: () => api.get('/auth/me').then((r) => r.data),
+  logout: () => { localStorage.removeItem('bidintel_token'); localStorage.removeItem('bidintel_user'); },
+  getUser: () => {
+    try { return JSON.parse(localStorage.getItem('bidintel_user') || 'null'); } catch { return null; }
+  },
+  setUser: (user) => {
+    localStorage.setItem('bidintel_token', user.token);
+    localStorage.setItem('bidintel_user', JSON.stringify(user));
+  },
+};
+
 export const fetcher = {
   getStats: () => api.get('/stats').then((r) => r.data),
   getEnums: () => api.get('/enums').then((r) => r.data),
@@ -23,6 +43,26 @@ export const fetcher = {
   listScopeRules: () => api.get('/scope-rules').then((r) => r.data),
   listScrapeRuns: (limit = 30) =>
     api.get('/scrape-runs', { params: { limit } }).then((r) => r.data),
+  listErrorLogs: (params) =>
+    api.get('/error-logs', { params }).then((r) => r.data),
+  resolveErrorLog: (id, body) =>
+    api.post(`/error-logs/${id}/resolve`, body).then((r) => r.data),
+  createScopeRule: (body) =>
+    api.post('/scope-rules', body).then((r) => r.data),
+  patchScopeRule: (id, body) =>
+    api.patch(`/scope-rules/${id}`, body).then((r) => r.data),
+  triggerScrape: (body) =>
+    api.post('/scrape-trigger', body).then((r) => r.data),
+  listTriggerTasks: () =>
+    api.get('/scrape-trigger/tasks').then((r) => r.data),
+  getTriggerTask: (id) =>
+    api.get(`/scrape-trigger/tasks/${id}`).then((r) => r.data),
+  exportCsvUrl: (params = {}) => {
+    const qs = new URLSearchParams(
+      Object.entries(params).filter(([, v]) => v != null && v !== '')
+    ).toString();
+    return `/api/announcements?format=csv&${qs}`;
+  },
 };
 
 export const fmt = {
