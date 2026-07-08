@@ -3,9 +3,14 @@ data/*.json
 data/*.html
 data/*.png
 data/*.txt
+data/*.db
+data/*.db-shm
+data/*.db-wal
 logs/*.log
 .env
 *.log
 .DS_Store
+# Claude Code 本地会话/计划/任务记录（不入 git）
+.claude/
 # 临时脚本归档（不入 git）
 archive/

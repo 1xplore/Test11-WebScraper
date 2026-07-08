@@ -1,0 +1,151 @@
+-- =============================================================
+-- 招标线索系统 SQLite schema（替代原 Notion 数据库）
+-- =============================================================
+
+-- ---------- 平台配置（替代 Notion SOURCE_DB + SOURCE_PAGES） ----------
+CREATE TABLE IF NOT EXISTS platforms (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  script_id       TEXT    UNIQUE NOT NULL,
+  name            TEXT    NOT NULL,
+  homepage        TEXT,
+  status          TEXT    NOT NULL DEFAULT '已配置运行中',  -- 已配置运行中 / 有错误 / 访问受限故停用 / 已配置但停用
+  enabled         INTEGER NOT NULL DEFAULT 1,              -- status 是否 = 已配置运行中（冗余便于快速过滤）
+  last_run_at     TEXT,
+  last_error      TEXT,
+  total_runs      INTEGER NOT NULL DEFAULT 0,
+  total_fetched   INTEGER NOT NULL DEFAULT 0,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ---------- 招标公告主表（替代 Notion 主库 32 字段） ----------
+CREATE TABLE IF NOT EXISTS announcements (
+  id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+  notice_id             TEXT,                          -- 源系统公告ID（联合 UNIQUE）
+  project_code          TEXT,                          -- 项目编号
+  source_platform_id    INTEGER NOT NULL REFERENCES platforms(id),
+
+  title                 TEXT NOT NULL,
+  detail_url            TEXT,
+  notice_type           TEXT,                          -- 采购公告 / 招标公告 / 资格预审公告 / 竞争性磋商公告 ...
+
+  notice_start_date     TEXT,                          -- 公告发布日期
+  notice_end_date       TEXT,                          -- 报名截止日期
+  bid_submit_deadline   TEXT,                          -- 投标截止时间
+  publicity_date        TEXT,                          -- 中标公示时间
+  result_date           TEXT,                          -- 中标时间
+  planned_tender_time   TEXT,                          -- 拟招标时间
+
+  district              TEXT,                          -- JSON array（multi_select，行政区）
+
+  tender_corp           TEXT,                          -- 招标人/采购人
+  tender_link_man       TEXT,
+  tender_link_phone     TEXT,
+  agency_corp           TEXT,                          -- 代理机构
+  agency_link_man       TEXT,
+  agency_link_phone     TEXT,
+  address               TEXT,
+  note_number           TEXT,                          -- 采购计划备案号
+
+  contract_price        REAL,                          -- 合同估算价（万元）
+  total_investment      REAL,                          -- 投资估算额（万元）
+  offer_price           REAL,                          -- 中标金额（万元）
+  tender_bond           REAL,                          -- 保证金（万元）
+  planned_period        INTEGER,                       -- 工期天数
+
+  description           TEXT,                          -- 项目详情（长文本）
+  requirement           TEXT,                          -- 资质要求（长文本）
+  raw_text              TEXT,                          -- 原始正文（供 AI 重算）
+
+  -- 自动推断字段（爬虫写入，人工不直接改）
+  scope_tags            TEXT,                          -- JSON array（招标范围标签）
+  business_match        TEXT,                          -- 主营业务可做 / 部分可做 / 不可做 / 待评估
+  project_progress      TEXT,                          -- 公告中 / 报名截止 / 开标中 / 评标中 / 中标公示 / 已中标 / 已流标 / 已终止 / 已结束
+  match_score           REAL,                          -- 综合匹配分（0~1，AI+算法）
+
+  -- 抓取状态（爬虫维护，更新时不能覆盖人工审核）
+  scrape_status         TEXT NOT NULL DEFAULT '已抓取',  -- 已抓取 / 已审核 / 已更新
+
+  -- 人工审核/跟进状态（**核心运营字段**）
+  review_status         TEXT NOT NULL DEFAULT 'A.未关注',  -- A.未关注 / A.关注中 / H.已投标 / X.已放弃 / Y.未中标 / Z.已中标
+  review_note           TEXT,
+  reviewed_at           TEXT,
+  reviewed_by           TEXT,
+
+  created_at            TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at            TEXT NOT NULL DEFAULT (datetime('now')),
+
+  UNIQUE(source_platform_id, notice_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_ann_start_date   ON announcements(notice_start_date DESC);
+CREATE INDEX IF NOT EXISTS idx_ann_business     ON announcements(business_match);
+CREATE INDEX IF NOT EXISTS idx_ann_review       ON announcements(review_status);
+CREATE INDEX IF NOT EXISTS idx_ann_progress     ON announcements(project_progress);
+CREATE INDEX IF NOT EXISTS idx_ann_platform     ON announcements(source_platform_id);
+CREATE INDEX IF NOT EXISTS idx_ann_district     ON announcements(district);
+CREATE INDEX IF NOT EXISTS idx_ann_title        ON announcements(title);
+
+-- ---------- Scope 规则（替代 Notion SCOPE_RULES_DB） ----------
+CREATE TABLE IF NOT EXISTS scope_rules (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  priority        REAL NOT NULL,
+  tag             TEXT NOT NULL,
+  keywords        TEXT NOT NULL,                       -- 原始关键词字符串（以 | 分隔）
+  stop_on_match   INTEGER NOT NULL DEFAULT 0,
+  enabled         INTEGER NOT NULL DEFAULT 1,
+  source          TEXT NOT NULL DEFAULT 'seed',         -- seed / manual / imported
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_scope_priority ON scope_rules(priority);
+
+-- ---------- 资质规则（预留，当前代码未读取但表已建） ----------
+CREATE TABLE IF NOT EXISTS qual_rules (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  priority        REAL NOT NULL,
+  tag             TEXT NOT NULL,
+  keywords        TEXT NOT NULL,
+  enabled         INTEGER NOT NULL DEFAULT 1,
+  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ---------- Scope 错误日志（替代 Notion SCOPE_ERROR_LOG_DB） ----------
+CREATE TABLE IF NOT EXISTS scope_error_logs (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  announcement_id     INTEGER REFERENCES announcements(id) ON DELETE CASCADE,
+  raw_text            TEXT NOT NULL,
+  resolved            INTEGER NOT NULL DEFAULT 0,
+  resolved_rule_id    INTEGER REFERENCES scope_rules(id),
+  resolved_tag        TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ---------- 资质错误日志（替代 Notion QUAL_ERROR_LOG_DB） ----------
+CREATE TABLE IF NOT EXISTS qual_error_logs (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  announcement_id     INTEGER REFERENCES announcements(id) ON DELETE CASCADE,
+  raw_text            TEXT NOT NULL,
+  resolved            INTEGER NOT NULL DEFAULT 0,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- ---------- 抓取运行日志（替代 Notion SCRAPE_LOG_DB） ----------
+CREATE TABLE IF NOT EXISTS scrape_runs (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  scrape_time         TEXT NOT NULL,
+  date_begin          TEXT NOT NULL,
+  date_end            TEXT NOT NULL,
+  platform_ids        TEXT NOT NULL,                    -- JSON array
+  announcement_ids    TEXT NOT NULL,                    -- JSON array
+  scope_error_ids     TEXT NOT NULL,                    -- JSON array
+  qual_error_ids      TEXT NOT NULL,                    -- JSON array
+  total_created       INTEGER NOT NULL DEFAULT 0,
+  total_updated       INTEGER NOT NULL DEFAULT 0,
+  total_skipped       INTEGER NOT NULL DEFAULT 0,
+  total_error         INTEGER NOT NULL DEFAULT 0,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_runs_scrape_time ON scrape_runs(scrape_time DESC);

@@ -1,0 +1,60 @@
+/**
+ * Express 入口
+ *
+ * 用法：
+ *   node server/src/server.js
+ *   PORT=4001 node server/src/server.js
+ */
+require('dotenv').config({ path: require('path').join(__dirname, '../../../.env') });
+
+const express = require('express');
+const cors = require('cors');
+const morgan = require('morgan');
+
+require('./db');          // 触发 migrate
+const statsRouter = require('./routes/stats');
+const annRouter = require('./routes/announcements');
+const platRouter = require('./routes/platforms');
+const scopeRouter = require('./routes/scope-rules');
+const runsRouter = require('./routes/scrape-runs');
+const matching = require('./services/matching');
+
+const app = express();
+app.use(cors());
+app.use(express.json({ limit: '2mb' }));
+app.use(morgan('tiny'));
+
+app.get('/api/health', (req, res) => {
+  res.json({ ok: true, time: new Date().toISOString(), ai_enabled: !!process.env.OPENAI_API_KEY });
+});
+
+app.get('/api/enums', (req, res) => {
+  res.json({
+    business_match: ['主营业务可做', '部分可做', '不可做', '待评估'],
+    review_status: ['A.未关注', 'A.关注中', 'H.已投标', 'X.已放弃', 'Y.未中标', 'Z.已中标'],
+    project_progress: ['公告中', '报名截止', '开标中', '评标中', '中标公示', '已中标', '已流标', '已终止', '已结束'],
+    notice_type: ['采购公告', '招标公告', '资格预审公告', '竞争性磋商公告', '公开招标', '公开公告', '竞争性磋商', '其他'],
+    scrape_status: ['已抓取', '已审核', '已更新'],
+    platform_status: ['已配置运行中', '有错误', '访问受限故停用', '已配置但停用'],
+    in_scope_tags: [...matching.IN_SCOPE],
+    out_scope_tags: [...matching.OUT_OF_SCOPE],
+    wuhan_districts: matching.WUHAN_DISTRICTS,
+  });
+});
+
+app.use('/api/stats', statsRouter);
+app.use('/api/announcements', annRouter);
+app.use('/api/platforms', platRouter);
+app.use('/api/scope-rules', scopeRouter);
+app.use('/api/scrape-runs', runsRouter);
+
+app.use((err, req, res, next) => {
+  console.error('[api error]', err);
+  res.status(500).json({ error: err.message || 'Internal Server Error' });
+});
+
+const PORT = parseInt(process.env.PORT || '4001', 10);
+app.listen(PORT, () => {
+  console.log(`\n[server] 招标线索 API listening on http://localhost:${PORT}`);
+  console.log(`[server] AI 匹配: ${process.env.OPENAI_API_KEY ? '启用' : '未启用（仅本地算法）'}`);
+});

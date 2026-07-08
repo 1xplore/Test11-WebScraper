@@ -1,19 +1,20 @@
 /**
  * 招标公告爬虫主入口
- * 流程：爬取 -> 落盘 -> 推送 Notion -> 写 1 条抓取日志（每天 1 条，跨所有站点）
+ * 流程：爬取 -> 落盘 -> 推送（Notion 或 SQLite）-> 写 1 条抓取日志（每天 1 条，跨所有站点）
  *
  * 用法：
  *   node main.js <site>            # 单站运行
  *   node main.js <site> --all      # 顺序运行所有站
  *   node main.js --all             # 同上
  *
- * 单站参数：
+ * 通用参数：
  *   --pages N            抓取页数（默认 1）
  *   --size N             每页条数（默认 10）
- *   --no-upload          仅爬取，不上传 Notion（也不写抓取日志）
+ *   --no-upload          仅爬取，不上传（也不写抓取日志）
  *   --no-skip-existing   强制更新已存在记录
  *   --output FILE        落盘文件名
  *   --since-days N       首次回溯天数（默认 7）—— 仅在没有历史抓取日志时生效
+ *   --storage K          存储后端：sqlite（默认）| notion
  */
 const path = require('path');
 const fs = require('fs');
@@ -43,7 +44,8 @@ const notion = require('./utils/notion');
 const { getScopeRules } = require('./utils/notionScopeRules');
 const { getEnabledSourceScriptIds } = require('./utils/sourceConfig');
 const { getLastScrapeTime, createScrapeLog } = require('./utils/scrapeLog');
-const { SOURCE_PAGES } = require('./config/notionDatabases');
+const { createStore, getEnabledScriptIdsSqlite } = require('./utils/storageRouter');
+const sqlite = require('./server/src/storage/adapter');
 
 const DATA_DIR = path.join(__dirname, 'data');
 
@@ -72,10 +74,12 @@ const SCRAPERS = {
 };
 
 /**
- * 计算本次抓取的时间窗：前次抓取时间 -1h 至今；首次回溯 sinceDays 天
+ * 计算本次抓取的时间窗
  */
-async function resolveTimeRange(sinceDays = 7) {
-  const last = await getLastScrapeTime();
+async function resolveTimeRange(store, sinceDays = 7) {
+  const last = store.kind === 'sqlite'
+    ? sqlite.getLastScrapeTime()
+    : await getLastScrapeTime();
   const to = new Date();
   const from = last
     ? new Date(last.getTime() - 3600 * 1000)
@@ -84,9 +88,9 @@ async function resolveTimeRange(sinceDays = 7) {
 }
 
 /**
- * 跑单站，返回该站结果（items / uploadResults / error log pageIds）
+ * 跑单站，返回该站结果
  */
-async function runScraper(scraper, opts, timeRange, scopeRules) {
+async function runScraper(scraper, opts, timeRange, scopeRules, store) {
   const siteName = scraper.meta?.name || 'scraper';
   console.log(`\n[${siteName}] 开始`);
   const r = await scraper.run({
@@ -100,13 +104,21 @@ async function runScraper(scraper, opts, timeRange, scopeRules) {
   let scopeIds = [];
   let qualIds = [];
   if (opts.upload && r.items.length > 0) {
-    uploadResults = await notion.uploadItems(r.items, {
+    const platformId = store.kind === 'sqlite'
+      ? store.getPlatformIdByScriptId(scraper.meta?.scriptId)
+      : null;
+    if (store.kind === 'sqlite' && !platformId) {
+      console.warn(`  [${siteName}] SQLite 中找不到 scriptId=${scraper.meta?.scriptId}，跳过上传`);
+      return { siteName, items: r.items, uploadResults: null, scopeIds, qualIds, stopReason: r.stopReason };
+    }
+    uploadResults = await store.uploadItems(r.items, {
       skipExisting: opts.skipExisting,
-      sourcePageId: scraper.meta?.sourcePageId
+      sourcePageId: scraper.meta?.sourcePageId,
+      platformId,
     });
     console.log(`  [${siteName}] 上传: 创建 ${uploadResults.created}, 更新 ${uploadResults.updated}, 跳过 ${uploadResults.skipped}, 失败 ${uploadResults.error}`);
-    if (scraper.writeFeedbackLogs) {
-      const ids = await scraper.writeFeedbackLogs(r.items, uploadResults);
+    if (scraper.writeFeedbackLogs && uploadResults.details) {
+      const ids = await store.writeFeedbackLogs(r.items, uploadResults, scraper.meta);
       scopeIds = ids.scopeIds || [];
       qualIds = ids.qualIds || [];
     }
@@ -114,9 +126,6 @@ async function runScraper(scraper, opts, timeRange, scopeRules) {
   return { siteName, items: r.items, uploadResults, scopeIds, qualIds, stopReason: r.stopReason };
 }
 
-/**
- * 把所有站的结果聚合成 1 条抓取日志写入
- */
 function collectPageIds(allResults) {
   const touchedIds = [];
   const scopeIds = [];
@@ -124,7 +133,7 @@ function collectPageIds(allResults) {
   for (const r of allResults) {
     for (const d of r.uploadResults?.details || []) {
       if (d.status === 'created' || d.status === 'updated') {
-        if (d.pageId) touchedIds.push(d.pageId);
+        if (d.id) touchedIds.push(d.id);
       }
     }
     for (const id of r.scopeIds || []) scopeIds.push(id);
@@ -133,21 +142,24 @@ function collectPageIds(allResults) {
   return { touchedIds, scopeIds, qualIds };
 }
 
-async function runAll(opts) {
+async function runAll(opts, store) {
   const scopeRules = await getScopeRules();
-  const timeRange = await resolveTimeRange(opts.sinceDays);
+  const timeRange = await resolveTimeRange(store, opts.sinceDays);
   console.log(`\n时间窗: ${timeRange.from.toISOString()} ~ ${timeRange.to.toISOString()} (${timeRange.hasHistory ? '有历史' : `首次回溯 ${opts.sinceDays} 天`})`);
 
-  const enabledIds = await getEnabledSourceScriptIds();
+  let enabledIds;
+  if (store.kind === 'sqlite') {
+    enabledIds = getEnabledScriptIdsSqlite();
+  } else {
+    enabledIds = await getEnabledSourceScriptIds();
+  }
+
   const enabledEntries = [];
   for (const [key, scraper] of Object.entries(SCRAPERS)) {
     const sid = scraper.meta?.scriptId;
-    if (!sid) {
-      console.warn(`[${key}] 缺少 meta.scriptId，跳过`);
-      continue;
-    }
+    if (!sid) { console.warn(`[${key}] 缺少 meta.scriptId，跳过`); continue; }
     if (!enabledIds.has(sid)) {
-      console.log(`[${key}] Notion 状态非"已配置运行中"，跳过 (scriptId=${sid})`);
+      console.log(`[${key}] 平台状态非"已配置运行中"，跳过 (scriptId=${sid})`);
       continue;
     }
     enabledEntries.push([key, scraper]);
@@ -157,7 +169,7 @@ async function runAll(opts) {
   const allResults = [];
   for (const [key, scraper] of enabledEntries) {
     try {
-      const r = await runScraper(scraper, opts, timeRange, scopeRules);
+      const r = await runScraper(scraper, opts, timeRange, scopeRules, store);
       allResults.push({ site: key, ...r });
     } catch (e) {
       console.error(`[${key}] 失败: ${e.message}`);
@@ -167,17 +179,28 @@ async function runAll(opts) {
 
   if (opts.upload && allResults.length > 0) {
     const { touchedIds, scopeIds, qualIds } = collectPageIds(allResults);
-    const platformIds = enabledEntries
-      .map(([, s]) => s.meta?.sourcePageId)
-      .filter(Boolean);
-    await createScrapeLog({
+    const platformIds = store.kind === 'sqlite'
+      ? store.resolvePlatformIdsFromMeta(enabledEntries)
+      : enabledEntries.map(([, s]) => s.meta?.sourcePageId).filter(Boolean);
+    const stats = allResults.reduce(
+      (acc, r) => {
+        acc.created += r.uploadResults?.created || 0;
+        acc.updated += r.uploadResults?.updated || 0;
+        acc.skipped += r.uploadResults?.skipped || 0;
+        acc.error += r.uploadResults?.error || 0;
+        return acc;
+      },
+      { created: 0, updated: 0, skipped: 0, error: 0 }
+    );
+    await store.createScrapeLog({
       scrapeTime: new Date(),
       dateBegin: timeRange.from,
       dateEnd: timeRange.to,
       platformPageIds: platformIds,
       announcementPageIds: touchedIds,
       scopeErrorPageIds: scopeIds,
-      qualErrorPageIds: qualIds
+      qualErrorPageIds: qualIds,
+      stats,
     });
   }
 
@@ -204,7 +227,8 @@ async function main() {
     upload: true,
     skipExisting: true,
     outputFile: null,
-    sinceDays: 7
+    sinceDays: 7,
+    storage: process.env.STORAGE || 'sqlite',
   };
   for (let i = 0; i < args.length; i++) {
     if (args[i] === '--all') continue;
@@ -214,7 +238,10 @@ async function main() {
     else if (args[i] === '--no-skip-existing') opts.skipExisting = false;
     else if (args[i] === '--output') opts.outputFile = args[++i];
     else if (args[i] === '--since-days') opts.sinceDays = parseInt(args[++i], 10);
+    else if (args[i] === '--storage') opts.storage = args[++i];
   }
+
+  const store = createStore(opts.storage);
 
   console.log('='.repeat(50));
   if (runAllFlag) {
@@ -222,13 +249,13 @@ async function main() {
   } else {
     console.log(`招标公告爬虫 - 目标: ${targetSite}`);
   }
-  console.log(`配置: ${opts.pageCount} 页 × ${opts.pageSize} 条, 上传=${opts.upload}, 跳过已存在=${opts.skipExisting}, 回溯=${opts.sinceDays}天`);
+  console.log(`配置: ${opts.pageCount} 页 × ${opts.pageSize} 条, 存储=${opts.storage}, 上传=${opts.upload}, 跳过已存在=${opts.skipExisting}, 回溯=${opts.sinceDays}天`);
   console.log('='.repeat(50));
 
   try {
     if (runAllFlag) {
-      const allResults = await runAll(opts);
-      const hasError = allResults.some(s => s.error);
+      const allResults = await runAll(opts, store);
+      const hasError = allResults.some((s) => s.error);
       console.log(hasError ? '\n✗ 部分失败' : '\n✓ 全部完成');
       process.exit(hasError ? 1 : 0);
     } else {
@@ -239,22 +266,31 @@ async function main() {
         process.exit(1);
       }
       const scopeRules = await getScopeRules();
-      const timeRange = await resolveTimeRange(opts.sinceDays);
+      const timeRange = await resolveTimeRange(store, opts.sinceDays);
       console.log(`\n时间窗: ${timeRange.from.toISOString()} ~ ${timeRange.to.toISOString()}`);
 
-      const r = await runScraper(scraper, opts, timeRange, scopeRules);
+      const r = await runScraper(scraper, opts, timeRange, scopeRules, store);
 
       if (opts.upload) {
         const { touchedIds, scopeIds, qualIds } = collectPageIds([r]);
-        const platformIds = Object.values(SOURCE_PAGES);
-        await createScrapeLog({
+        const platformIds = store.kind === 'sqlite'
+          ? [store.getPlatformIdByScriptId(scraper.meta?.scriptId)].filter(Boolean)
+          : [scraper.meta.sourcePageId];
+        const stats = {
+          created: r.uploadResults?.created || 0,
+          updated: r.uploadResults?.updated || 0,
+          skipped: r.uploadResults?.skipped || 0,
+          error: r.uploadResults?.error || 0,
+        };
+        await store.createScrapeLog({
           scrapeTime: new Date(),
           dateBegin: timeRange.from,
           dateEnd: timeRange.to,
-          platformPageIds: [scraper.meta.sourcePageId],
+          platformPageIds: platformIds,
           announcementPageIds: touchedIds,
           scopeErrorPageIds: scopeIds,
-          qualErrorPageIds: qualIds
+          qualErrorPageIds: qualIds,
+          stats,
         });
       }
       console.log('\n✓ 全部完成');
