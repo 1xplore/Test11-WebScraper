@@ -29,7 +29,24 @@ const matching = require('./services/matching');
 const storage = require('./storage/adapter');
 
 const app = express();
-app.use(cors());
+// Loop 28: CORS 锁白名单（修 loop 9 audit F3 项目级债）
+//   之前 `cors()` 全开 + 全局 token 一起有 CSRF 风险
+//   现在 origin 白名单：环境变量 ALLOWED_ORIGINS（逗号分隔）
+//   缺省值：本地开发（localhost:5173/4173）+ production 域名
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || [
+  'http://localhost:5173',
+  'http://localhost:4173',
+  'https://bid.1xplore.cn',
+].join(',')).split(',').map((s) => s.trim()).filter(Boolean);
+app.use(cors({
+  origin: (origin, cb) => {
+    // 同源请求（curl / server-side）无 Origin header → 允许
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    return cb(new Error(`CORS: origin ${origin} not allowed`));
+  },
+  credentials: true,
+}));
 app.use(express.json({ limit: '2mb' }));
 app.use(morgan('tiny'));
 
