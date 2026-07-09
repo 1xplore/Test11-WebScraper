@@ -13,6 +13,23 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// 401 拦截：清 token + 强制 reload 跳登录（loop 10 补的 response interceptor，避免吞 401）
+api.interceptors.response.use(
+  (resp) => resp,
+  (err) => {
+    if (err?.response?.status === 401) {
+      // 401 来自业务错（如 GET /auth/me） vs 来自 server.js 的 requireAuth（mutations）—— 都清
+      localStorage.removeItem('bidintel_token');
+      localStorage.removeItem('bidintel_user');
+      // 用一次 dispatchEvent 让未来组件能听 'auth:logout'
+      window.dispatchEvent(new CustomEvent('auth:logout', { detail: { source: '401' } }));
+      // 不重定向：当前页可能正显示数据；由 AppShell 在登录 pill 消失时自然提示重登
+      // 后续若需要硬跳转：window.location.href = '/login'
+    }
+    return Promise.reject(err);
+  }
+);
+
 export const auth = {
   login: (username) => api.post('/auth/login', { username }).then((r) => r.data),
   me: () => api.get('/auth/me').then((r) => r.data),

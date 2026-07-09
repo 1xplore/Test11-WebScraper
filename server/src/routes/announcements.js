@@ -65,22 +65,15 @@ router.get('/:id', (req, res) => {
 });
 
 // PATCH /api/announcements/:id/review  body: { reviewStatus, reviewNote, reviewedBy? }
+// requireAuth 已挂上路由（server.js），req.user 一定存在；不再二次 resolve token
 router.patch('/:id/review', (req, res) => {
   const id = parseInt(req.params.id, 10);
   const { reviewStatus, reviewNote, reviewedBy } = req.body || {};
-  // 如果未传 reviewedBy，从 token 反查
-  const finalReviewedBy = reviewedBy || resolveUserFromToken(req)?.username || 'me';
+  const finalReviewedBy = reviewedBy || req.user.username;
   const updated = storage.patchAnnouncementReview(id, { reviewStatus, reviewNote, reviewedBy: finalReviewedBy });
   if (!updated) return res.status(404).json({ error: 'Not found' });
   res.json(updated);
 });
-
-function resolveUserFromToken(req) {
-  const h = req.headers.authorization || '';
-  if (!h.startsWith('Bearer ')) return null;
-  const storage = require('../storage/adapter');
-  return storage.getUserByToken(h.slice(7).trim());
-}
 
 // POST /api/announcements/:id/reviewed   标记已审核
 router.post('/:id/reviewed', (req, res) => {

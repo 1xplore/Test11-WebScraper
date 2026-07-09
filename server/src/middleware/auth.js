@@ -39,6 +39,9 @@ function requireAuth(req, res, next) {
 /**
  * GET 全开放 / 写入必须 token —— 把 requireAuth 包一层"method 判定"
  * 这样 app.use('/api/x', mutationsOnlyAuth, xRouter) 一行挂整套，不用逐条改 router
+ *
+ * 覆盖的 method：POST / PATCH / PUT / DELETE（任何 server 写）
+ * 注：未来若加 DELETE /api/x/:id 这种写法也走 requireAuth（line 79 if 已覆盖）
  */
 function mutationsOnlyAuth(req, res, next) {
   if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {

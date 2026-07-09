@@ -52,16 +52,21 @@ app.get('/api/enums', (req, res) => {
 });
 
 const { mutationsOnlyAuth } = require('./middleware/auth');
+// 注意 mount 语义：
+//   - /api/auth        不挂 auth（login 必须能公开访问，新用户能进）
+//   - /api/scrape-runs 不挂 auth（当前仅 GET 列表；未来若加 POST，回归此处）
+//   - /api/health /api/enums 直接 app.get 声明，不在 router 下，天然不受影响
+//   - 其余 8 个全部挂 mutationsOnlyAuth（GET 开放，写入要 Bearer）
 app.use('/api/stats', statsRouter);
-app.use('/api/announcements', mutationsOnlyAuth, annRouter);  // GET 开放 / 写入要 Bearer token
+app.use('/api/announcements', mutationsOnlyAuth, annRouter);
 app.use('/api/platforms', mutationsOnlyAuth, platRouter);
 app.use('/api/scope-rules', mutationsOnlyAuth, scopeRouter);
 app.use('/api/qual-rules', mutationsOnlyAuth, qualRouter);
 app.use('/api/notice-rules', mutationsOnlyAuth, noticeRouter);
-app.use('/api/scrape-runs', runsRouter);
+app.use('/api/scrape-runs', runsRouter);                       // 目前 GET only，免挂
 app.use('/api/error-logs', mutationsOnlyAuth, errLogsRouter);
 app.use('/api/scrape-trigger', mutationsOnlyAuth, triggerRouter);
-app.use('/api/auth', authRouter);                          // /login /me /users 都不需要 token
+app.use('/api/auth', authRouter);
 app.use('/api/settings', mutationsOnlyAuth, settingsRouter);
 
 app.use((err, req, res, next) => {

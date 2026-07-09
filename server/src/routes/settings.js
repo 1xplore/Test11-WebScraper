@@ -46,7 +46,8 @@ router.get('/ai', (req, res) => {
 // PUT /api/settings/ai   body: { provider?, baseUrl?, model?, apiKey?, clearApiKey? }
 router.put('/ai', (req, res) => {
   const { provider, baseUrl, model, apiKey, clearApiKey } = req.body || {};
-  const userId = resolveUserFromToken(req)?.id || null;
+  // requireAuth 挂上路由（server.js），req.user 一定存在
+  const userId = req.user?.id || null;
 
   if (provider !== undefined && provider !== '') storage.setSetting(AI_KEYS.provider, provider, userId);
   if (baseUrl !== undefined && baseUrl !== '') storage.setSetting(AI_KEYS.baseUrl, baseUrl, userId);
@@ -75,10 +76,6 @@ router.post('/ai/test', async (req, res) => {
   res.json(result);
 });
 
-function resolveUserFromToken(req) {
-  const h = req.headers.authorization || '';
-  if (!h.startsWith('Bearer ')) return null;
-  return storage.getUserByToken(h.slice(7).trim());
-}
+// (resolveUserFromToken 已删除 —— 由 server.js 挂的 requireAuth 中间件统一处理)
 
 module.exports = router;
