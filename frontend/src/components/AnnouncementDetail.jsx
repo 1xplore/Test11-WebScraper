@@ -28,6 +28,8 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
   const [learnLoading, setLearnLoading] = useState(false);
   const [learnQualResult, setLearnQualResult] = useState(null);
   const [learnQualLoading, setLearnQualLoading] = useState(false);
+  const [learnNoticeTypeResult, setLearnNoticeTypeResult] = useState(null);
+  const [learnNoticeTypeLoading, setLearnNoticeTypeLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
 
@@ -111,7 +113,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
   }
 
   async function runLearnQualFromMiss() {
-    if (!item || learnLoading || learnQualLoading) return;
+    if (!item || learnLoading || learnQualLoading || learnNoticeTypeLoading) return;
     setLearnQualLoading(true);
     setLearnQualResult(null);
     try {
@@ -126,6 +128,25 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
       setLearnQualResult({ applied: false, error: e.message });
     } finally {
       setLearnQualLoading(false);
+    }
+  }
+
+  async function runLearnNoticeTypeFromMiss() {
+    if (!item || learnLoading || learnQualLoading || learnNoticeTypeLoading) return;
+    setLearnNoticeTypeLoading(true);
+    setLearnNoticeTypeResult(null);
+    try {
+      const r = await fetcher.learnNoticeTypeFromMiss(item.id);
+      setLearnNoticeTypeResult(r);
+      if (r.applied) {
+        const fresh = await fetcher.getAnnouncement(item.id);
+        setItem(fresh);
+        onChanged?.(fresh);
+      }
+    } catch (e) {
+      setLearnNoticeTypeResult({ applied: false, error: e.message });
+    } finally {
+      setLearnNoticeTypeLoading(false);
     }
   }
 
@@ -270,6 +291,36 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                 title="让 AI 从公告 requirement 中提炼资质类别、沉淀 qual_rules"
               >
                 {learnQualLoading ? '学资质中…' : 'AI 学资质'}
+              </Button>
+            </div>
+
+            {/* AI 学一下（公告类型） —— 自迭代第三套：让 AI 提议 type + 沉淀 notice_type_rules */}
+            <div className="ai-banner mt-2" style={{ borderColor: 'var(--accent)' }}>
+              <div>
+                <Brain className="h-3.5 w-3.5 inline mr-1 text-accent" />
+                <span className="ai-banner-text">AI 学一下（公告类型）</span>
+                {learnNoticeTypeResult?.applied && (
+                  <span className="ml-3 text-success-fg">
+                    沉淀成功：tag=<b>{learnNoticeTypeResult.rule?.tag}</b>，关键词={JSON.stringify(learnNoticeTypeResult.rule?.keywords)}
+                    {learnNoticeTypeResult.noticeTypeTags ? ` · 本公告 tags=${JSON.stringify(learnNoticeTypeResult.noticeTypeTags)}` : ''}
+                    {learnNoticeTypeResult.reason ? ` · ${learnNoticeTypeResult.reason}` : ''}
+                  </span>
+                )}
+                {learnNoticeTypeResult?.applied === false && learnNoticeTypeResult?.message && (
+                  <span className="ml-3 text-warning-fg">{learnNoticeTypeResult.message}</span>
+                )}
+                {learnNoticeTypeResult?.applied === false && learnNoticeTypeResult?.error && (
+                  <span className="ml-3 text-danger">{learnNoticeTypeResult.error}</span>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={learnNoticeTypeLoading}
+                onClick={runLearnNoticeTypeFromMiss}
+                title="让 AI 判断本公告类型（如招标公告/资格预审公告/竞争性磋商公告）、沉淀 notice_type_rules"
+              >
+                {learnNoticeTypeLoading ? '学类型中…' : 'AI 学类型'}
               </Button>
             </div>
 

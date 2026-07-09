@@ -38,6 +38,7 @@ export const fetcher = {
   aiMatch: (id) => api.post(`/announcements/${id}/ai-match`).then((r) => r.data),
   learnFromMiss: (id) => api.post('/scope-rules/learn-from-miss', { announcementId: id }).then((r) => r.data),
   learnQualFromMiss: (id) => api.post('/qual-rules/learn-from-miss', { announcementId: id }).then((r) => r.data),
+  learnNoticeTypeFromMiss: (id) => api.post('/notice-rules/learn-from-miss', { announcementId: id }).then((r) => r.data),
   listPlatforms: (params) =>
     api.get('/platforms', { params }).then((r) => r.data),
   patchPlatform: (scriptId, body) =>
