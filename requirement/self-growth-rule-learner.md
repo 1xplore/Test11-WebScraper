@@ -1,6 +1,6 @@
 # 自迭代规则学习通用抽象（ruleLearner）
 
-> Loop 5 把 scopeAi / qualAi 的重复逻辑提到 `services/ruleLearner.js`。
+> Loop 5 把 scopeAi / qualAi 的重复逻辑提到 `services/ruleLearner.js`；loop 23 加 AND 语法；loop 24 把 AND 提示给三个 AI 服务。
 > 同步登记到 [REQUIREMENT.md §5](../REQUIREMENT.md)。
 
 ## 1. 一句话
