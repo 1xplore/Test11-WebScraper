@@ -12,6 +12,14 @@
 const fs = require('fs');
 const path = require('path');
 
+// ---------------- 常量 ----------------
+
+/**
+ * AI 沉淀规则统一优先级：放在所有 seed / manual 之后才匹配
+ * 这样系统已沉淀的 tag 永远先命中，新学规则只补"系统没覆盖"的边界
+ */
+const AI_LEARNED_PRIORITY = 999;
+
 // ---------------- 工具 ----------------
 
 /**
@@ -100,20 +108,26 @@ function reconcileWithWhitelist(aiTag, { whitelist, existingTags }) {
 /**
  * 修 loop 1 audit F6 / loop 3 audit F6 —— 尊重 ai.matchExisting 字段
  * 当 AI 自报 matchExisting=true 且现有规则能命中 → 视为已覆盖，不重复写
+ *
+ * @param {{ai, text, existingRules, forTag, compiledRules?}} opts
+ *   compiledRules: 已 compile 的 [{priority, tag, regex}]；不传时内联 compile（每次 O(N)）
  * @returns {{covered: boolean, hitRule?: object}}
  */
-function checkAlreadyCovered({ ai, text, existingRules, forTag }) {
+function checkAlreadyCovered({ ai, text, existingRules, forTag, compiledRules = null }) {
   if (!ai || ai.matchExisting !== true) return { covered: false };
-  const hit = existingRules.find((r) => {
-    if (forTag && r.tag !== forTag) return false;
+  const compiled = compiledRules || existingRules.map((r) => ({
+    _row: r,
+    regex: compileKeywords(r.keywords),
+  }));
+  const hit = compiled.find((c) => {
+    if (forTag && c._row.tag !== forTag) return false;
     try {
-      const re = compileKeywords(r.keywords);
-      return re.test(text);
+      return c.regex.test(text);
     } catch {
       return false;
     }
   });
-  return hit ? { covered: true, hitRule: hit } : { covered: false };
+  return hit ? { covered: true, hitRule: hit._row } : { covered: false };
 }
 
 // ---------------- LLM 调用 ----------------
@@ -171,6 +185,8 @@ function readProjectDoc(relPath) {
 }
 
 module.exports = {
+  // 全局常量：AI 沉淀规则的优先级（最低，原生 seed 跑完后才匹配）
+  AI_LEARNED_PRIORITY,
   tagNormalize,
   compileKeywords,
   buildDynamicRules,

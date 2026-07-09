@@ -58,7 +58,10 @@
 - [x] qual 服务（学习 + 白名单）(bb89745, 2026-07-10)
 - [x] qual_tags 回写（announcement）(pending-commit, 2026-07-10)
 - [x] qual 前端"AI 学资质"按钮 (bb89745, 2026-07-10)
-- [x] qual 审计修复（Loop 4）(pending-commit, 2026-07-10)
+- [x] qual 审计修复（Loop 4）(9277eaf, 2026-07-10)
+- [x] ruleLearner 抽象层（通用）(5b67a95, 2026-07-10)
+- [x] ruleLearner 审计修 + 单一源(loop6 commit, 2026-07-10)
+- [x] notice_type 第三套自迭代 (loop6 commit, 2026-07-10)
 - [ ] 后台 worker 自动批跑
 - [ ] dashboard 看 AI 沉淀规则命中率
 

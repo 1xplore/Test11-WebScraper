@@ -14,7 +14,7 @@ const storage = require('../storage/adapter');
 const matching = require('./matching');
 const ruleLearner = require('./ruleLearner');
 
-const AI_LEARNED_QUAL_PRIORITY = 999;
+const { AI_LEARNED_PRIORITY } = ruleLearner;
 const AI_LEARNED_QUAL_SOURCE = 'ai-learned';
 
 const QUAL_SCOPE = new Set([
@@ -161,7 +161,7 @@ async function learnQualFromMiss(announcementId) {
   let newRule;
   try {
     newRule = storage.createQualRule({
-      priority: AI_LEARNED_QUAL_PRIORITY,
+      priority: AI_LEARNED_PRIORITY,
       tag: finalTag,
       keywords: verified.join('|'),
       enabled: 1,
@@ -177,7 +177,7 @@ async function learnQualFromMiss(announcementId) {
       storage.patchAnnouncementQual(ann.id, refreshedQualTags);
       return {
         applied: true,
-        rule: { id: existing.id, tag: existing.tag, keywords: verified, source: AI_LEARNED_QUAL_SOURCE, priority: AI_LEARNED_QUAL_PRIORITY },
+        rule: { id: existing.id, tag: existing.tag, keywords: verified, source: AI_LEARNED_QUAL_SOURCE, priority: AI_LEARNED_PRIORITY },
         matchedExisting: !!ai.matchExisting,
         textSource,
         qualTags: refreshedQualTags,
@@ -195,7 +195,7 @@ async function learnQualFromMiss(announcementId) {
 
   return {
     applied: true,
-    rule: { id: newRule.id, tag: finalTag, keywords: verified, source: AI_LEARNED_QUAL_SOURCE, priority: AI_LEARNED_QUAL_PRIORITY },
+    rule: { id: newRule.id, tag: finalTag, keywords: verified, source: AI_LEARNED_QUAL_SOURCE, priority: AI_LEARNED_PRIORITY },
     matchedExisting: !!ai.matchExisting,
     textSource,
     qualTags: refreshedQualTags,
@@ -205,7 +205,7 @@ async function learnQualFromMiss(announcementId) {
 
 module.exports = {
   learnQualFromMiss,
-  AI_LEARNED_QUAL_PRIORITY,
+  AI_LEARNED_PRIORITY,
   AI_LEARNED_QUAL_SOURCE,
   QUAL_SCOPE,
 };

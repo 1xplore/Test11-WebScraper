@@ -24,6 +24,7 @@ function rowToAnnouncement(row) {
     ...row,
     scope_tags: fromJsonArray(row.scope_tags),
     qual_tags: fromJsonArray(row.qual_tags),
+    notice_type_tags: fromJsonArray(row.notice_type_tags),
     district: fromJsonArray(row.district),
   };
 }
@@ -266,6 +267,17 @@ function patchAnnouncementQual(id, qualTags) {
   return getAnnouncement(id);
 }
 
+/**
+ * 写 announcements.notice_type_tags —— 第三套自迭代（Loop 6）回写
+ */
+function patchAnnouncementNoticeType(id, noticeTypeTags) {
+  if (noticeTypeTags === undefined) return null;
+  db.prepare(
+    'UPDATE announcements SET notice_type_tags = ?, updated_at = datetime(\'now\') WHERE id = ?'
+  ).run(toJsonArray(noticeTypeTags), id);
+  return getAnnouncement(id);
+}
+
 // ---------- 反馈日志 ----------
 
 function writeScopeErrorLog(announcementId, rawText) {
@@ -423,6 +435,41 @@ function invalidateQualRulesCache() {
   try { _qualRulesCacheInvalidator(); } catch (_) { /* 同上 */ }
 }
 
+// ---------- 公告类型（notice_type_rules）—— 第三套 self-growth (Loop 6) ----------
+
+function listNoticeTypeRules({ enabledOnly = false } = {}) {
+  const sql = enabledOnly
+    ? 'SELECT * FROM notice_type_rules WHERE enabled = 1 ORDER BY priority ASC'
+    : 'SELECT * FROM notice_type_rules ORDER BY priority ASC';
+  return db.prepare(sql).all();
+}
+
+function patchNoticeTypeRule(id, patch) {
+  const allowed = ['priority', 'tag', 'keywords', 'enabled'];
+  const fields = Object.entries(patch).filter(([k]) => allowed.includes(k));
+  if (fields.length === 0) return null;
+  const sql = `UPDATE notice_type_rules SET ${fields.map(([k]) => `${k} = ?`).join(', ')}, updated_at = datetime('now') WHERE id = ?`;
+  db.prepare(sql).run(...fields.map(([, v]) => v), id);
+  invalidateNoticeTypeRulesCache();
+  return db.prepare('SELECT * FROM notice_type_rules WHERE id = ?').get(id);
+}
+
+function createNoticeTypeRule({ priority, tag, keywords, enabled = 1, source = 'manual' }) {
+  const info = db.prepare(
+    'INSERT INTO notice_type_rules (priority, tag, keywords, enabled, source) VALUES (?, ?, ?, ?, ?)'
+  ).run(priority, tag, keywords, enabled ? 1 : 0, source);
+  invalidateNoticeTypeRulesCache();
+  return db.prepare('SELECT * FROM notice_type_rules WHERE id = ?').get(info.lastInsertRowid);
+}
+
+let _noticeTypeRulesCacheInvalidator = () => {};
+function registerNoticeTypeRulesCacheInvalidator(fn) {
+  if (typeof fn === 'function') _noticeTypeRulesCacheInvalidator = fn;
+}
+function invalidateNoticeTypeRulesCache() {
+  try { _noticeTypeRulesCacheInvalidator(); } catch (_) { /* 同上 */ }
+}
+
 // ---------- 抓取运行日志 ----------
 
 function getLastScrapeTime() {
@@ -574,7 +621,7 @@ module.exports = {
   getPlatformByScriptId, listPlatforms, updatePlatformStatus, patchPlatform,
   // announcements
   findExisting, upsertAnnouncement, listAnnouncements, getAnnouncement,
-  patchAnnouncementReview, patchAnnouncementScope, patchAnnouncementQual, markReviewed,
+  patchAnnouncementReview, patchAnnouncementScope, markReviewed,
   // feedback logs
   writeScopeErrorLog, writeQualErrorLog, writeFeedbackLogs,
   listScopeErrorLogs, listQualErrorLogs, resolveScopeError, getErrorLogCounts,
@@ -585,6 +632,11 @@ module.exports = {
   // qual rules
   listQualRules, patchQualRule, createQualRule,
   registerQualRulesCacheInvalidator, invalidateQualRulesCache,
+  // notice_type rules
+  listNoticeTypeRules, patchNoticeTypeRule, createNoticeTypeRule,
+  registerNoticeTypeRulesCacheInvalidator, invalidateNoticeTypeRulesCache,
+  // announcement tag patches
+  patchAnnouncementQual, patchAnnouncementNoticeType,
   // scrape runs
   getLastScrapeTime, createScrapeRun, listScrapeRuns,
   // users

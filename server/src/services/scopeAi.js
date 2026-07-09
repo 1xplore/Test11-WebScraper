@@ -19,7 +19,8 @@ const storage = require('../storage/adapter');
 const matching = require('./matching');
 const ruleLearner = require('./ruleLearner');
 
-const AI_LEARNED_PRIORITY = 999;
+const { AI_LEARNED_PRIORITY, ...rest } = ruleLearner;
+// 抽象层常量与配置一致；source 保持本服务命名空间（不同规则表可用相同 source 值）
 const AI_LEARNED_SOURCE = 'ai-learned';
 
 async function learnFromMiss(announcementId) {
@@ -108,8 +109,10 @@ async function learnFromMiss(announcementId) {
   }
 
   // 3) whitelist reconcile（修 loop 1 F6 / loop 3 F3 同款问题）
+  // 仅匹配 IN_SCOPE（公司主营）+ existingTags；OUT_OF_SCOPE 不允许（这是"我们不能做"的标记，
+  // 由 businessMatch 推断，不是 AI 给 announcement 打的 tag）
   const wl = ruleLearner.reconcileWithWhitelist(ai.tag, {
-    whitelist: [...matching.IN_SCOPE, ...matching.OUT_OF_SCOPE],
+    whitelist: [...matching.IN_SCOPE],
     existingTags,
   });
   if (!wl.allowed) {
@@ -120,7 +123,7 @@ async function learnFromMiss(announcementId) {
     return {
       applied: false,
       reason: 'ai_tag_outside_whitelist',
-      message: `AI 提议的 tag "${wl.finalTag}" 不在白名单（IN/OUT_SCOPE 共 ${matching.IN_SCOPE.size + matching.OUT_OF_SCOPE.size} 项 + 现有 ${existingTags.length} 项）`,
+      message: `AI 提议的 tag "${wl.finalTag}" 不在白名单（IN_SCOPE ${matching.IN_SCOPE.size} 项 + 现有 ${existingTags.length} 项）`,
       suggestion: { tag: ai.tag, keywords: ai.keywords, reason: ai.reason },
     };
   }
@@ -131,15 +134,16 @@ async function learnFromMiss(announcementId) {
     ai, text, existingRules, forTag: finalTag,
   });
   if (covered.covered) {
+    const newTags = matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true }));
+    const businessMatch = matching.inferBusinessMatch(newTags);
+    storage.patchAnnouncementScope(ann.id, { scope_tags: newTags, business_match: businessMatch });
     return {
       applied: true,
       note: 'already_covered',
       coveredBy: { id: covered.hitRule.id, tag: covered.hitRule.tag },
       matchedExisting: true,
-      newTags: matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true })),
-      businessMatch: matching.inferBusinessMatch(
-        matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true }))
-      ),
+      newTags,
+      businessMatch,
       reason: ai.reason || '',
     };
   }
@@ -160,14 +164,15 @@ async function learnFromMiss(announcementId) {
       const existing = storage.listScopeRules({ enabledOnly: true })
         .find((r) => r.source === AI_LEARNED_SOURCE && r.tag === finalTag && r.keywords === verified.join('|'));
       if (!existing) throw e;
+      const newTags = matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true }));
+      const businessMatch = matching.inferBusinessMatch(newTags);
+      storage.patchAnnouncementScope(ann.id, { scope_tags: newTags, business_match: businessMatch });
       return {
         applied: true,
         rule: { id: existing.id, tag: existing.tag, keywords: verified, source: AI_LEARNED_SOURCE, priority: AI_LEARNED_PRIORITY },
         matchedExisting: !!ai.matchExisting,
-        newTags: matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true })),
-        businessMatch: matching.inferBusinessMatch(
-          matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true }))
-        ),
+        newTags,
+        businessMatch,
         reason: ai.reason || '',
         note: 'rule already exists (dedup by partial unique index)',
       };

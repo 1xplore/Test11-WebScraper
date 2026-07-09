@@ -37,6 +37,19 @@ function migrate() {
   if (!annCols.includes('qual_tags')) {
     db.exec("ALTER TABLE announcements ADD COLUMN qual_tags TEXT");
   }
+  // announcements.notice_type_tags 列（loop 6: 第三套自迭代回写）
+  if (!annCols.includes('notice_type_tags')) {
+    db.exec("ALTER TABLE announcements ADD COLUMN notice_type_tags TEXT");
+  }
+
+  // notice_type_rules 列（loop 6 incremental）
+  const ntcCols = db.prepare('PRAGMA table_info(notice_type_rules)').all().map((c) => c.name);
+  if (!ntcCols.includes('source')) {
+    db.exec("ALTER TABLE notice_type_rules ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'");
+  }
+  if (!ntcCols.includes('updated_at')) {
+    db.exec("ALTER TABLE notice_type_rules ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
+  }
 
   // AI 沉淀去重索引：partial UNIQUE on (tag, keywords) WHERE source='ai-learned'
   // 必须在 source 列就位之后；schema.sql 的 IF NOT EXISTS 不够（老库没列就 fail）

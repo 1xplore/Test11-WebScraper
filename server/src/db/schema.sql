@@ -125,6 +125,23 @@ CREATE INDEX IF NOT EXISTS idx_qual_priority ON qual_rules(priority);
 -- 索引创建必须在 qual_rules.source 列存在之后；老库迁移见 db/index.js#migrate()
 -- 新装本文件 IF NOT EXISTS 会自动建好（前提 schema 中已含 source 列）
 
+-- ---------- 公告类型规则（notice_type_rules）—— 自迭代第三套（Loop 6）----------
+-- 现行 schema 中 notice_type 是 ENUM 字段（见 enums），硬塞给 announcements
+-- 新增 self-growth 表让 AI 学"招标公告 / 资格预审 / 竞争性磋商 / 公开招标 ..."的关键词
+CREATE TABLE IF NOT EXISTS notice_type_rules (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  priority        REAL NOT NULL,
+  tag             TEXT NOT NULL,
+  keywords        TEXT NOT NULL,
+  enabled         INTEGER NOT NULL DEFAULT 1,
+  source          TEXT NOT NULL DEFAULT 'manual',       -- seed / manual / imported / ai-learned
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_notice_type_priority ON notice_type_rules(priority);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_ai_learned_notice_type_tag_kw
+  ON notice_type_rules(tag, keywords) WHERE source = 'ai-learned';
+
 -- ---------- Scope 错误日志（替代 Notion SCOPE_ERROR_LOG_DB） ----------
 CREATE TABLE IF NOT EXISTS scope_error_logs (
   id                  INTEGER PRIMARY KEY AUTOINCREMENT,

@@ -170,13 +170,42 @@ function inferQual(text, dynamicRules = null) {
   return tags.length > 0 ? tags : ['未匹配'];
 }
 
-function compileKeywords(kwStr) {
-  // 把 "EPC|设计施工总承包|设计采购施工|设计施工" → /EPC|设计施工总承包|设计采购施工|设计施工/
-  // 同时清理空段、转义 regex 元字符
-  const parts = String(kwStr).split('|').map((s) => s.trim()).filter(Boolean);
-  if (parts.length === 0) return /(?!.)/;  // 永不匹配
-  const escaped = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  return new RegExp(escaped.join('|'));
+// ---------- 公告类型（notice_type_rules）正则匹配 —— 第三套 self-growth (Loop 6) ----------
+
+const _noticeTypeRulesCache = { value: null, at: 0 };
+function loadActiveNoticeTypeRules() {
+  const now = Date.now();
+  if (_noticeTypeRulesCache.value && now - _noticeTypeRulesCache.at < 30_000) {
+    return _noticeTypeRulesCache.value;
+  }
+  const rows = storage.listNoticeTypeRules({ enabledOnly: true });
+  const rules = rows.map((r) => ({
+    priority: r.priority,
+    tag: r.tag,
+    regex: compileKeywords(r.keywords),
+  }));
+  _noticeTypeRulesCache.value = rules;
+  _noticeTypeRulesCache.at = now;
+  return rules;
+}
+
+function invalidateNoticeTypeRulesCache() {
+  _noticeTypeRulesCache.value = null;
+  _noticeTypeRulesCache.at = 0;
+}
+
+try {
+  storage.registerNoticeTypeRulesCacheInvalidator(invalidateNoticeTypeRulesCache);
+} catch (_) { /* bootstrap 阶段静默 */ }
+
+function inferNoticeType(text, dynamicRules = null) {
+  const rules = dynamicRules || loadActiveNoticeTypeRules();
+  if (!rules.length) return [];
+  const tags = [];
+  for (const r of rules) {
+    if (r.regex.test(text)) tags.push(r.tag);
+  }
+  return tags;
 }
 
 function inferBusinessMatch(scopeTags) {
@@ -240,6 +269,7 @@ function computeLocalScore(scopeTags, title) {
  *   AI_MATCH_TIMEOUT_MS  可选，默认 8000
  */
 const storage = require('../storage/adapter');
+const { compileKeywords } = require('./ruleLearner');
 
 async function aiRefine({ title, description, scopeTags }) {
   const apiKey = storage.getSetting('ai_api_key') || process.env.OPENAI_API_KEY;
@@ -411,11 +441,13 @@ module.exports = {
   extractDistrict,
   inferScope,
   inferQual,
+  inferNoticeType,
   inferBusinessMatch,
   inferProgress,
   compileKeywords,
   invalidateScopeRulesCache,
   invalidateQualRulesCache,
+  invalidateNoticeTypeRulesCache,
   computeLocalScore,
   aiRefine,
   testAiConnection,
