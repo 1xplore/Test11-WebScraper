@@ -23,6 +23,7 @@ function rowToAnnouncement(row) {
   return {
     ...row,
     scope_tags: fromJsonArray(row.scope_tags),
+    qual_tags: fromJsonArray(row.qual_tags),
     district: fromJsonArray(row.district),
   };
 }
@@ -250,6 +251,18 @@ function patchAnnouncementScope(id, { scope_tags, business_match, match_score } 
   updates.push('updated_at = datetime(\'now\')');
   params.push(id);
   db.prepare(`UPDATE announcements SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  return getAnnouncement(id);
+}
+
+/**
+ * 仅写 announcements.qual_tags —— 自迭代资质匹配用
+ * 不影响业务字段（业务匹配用 scope_tags + business_match；qual_tags 是辅助标签）
+ */
+function patchAnnouncementQual(id, qualTags) {
+  if (qualTags === undefined) return null;
+  db.prepare(
+    'UPDATE announcements SET qual_tags = ?, updated_at = datetime(\'now\') WHERE id = ?'
+  ).run(toJsonArray(qualTags), id);
   return getAnnouncement(id);
 }
 
@@ -561,7 +574,7 @@ module.exports = {
   getPlatformByScriptId, listPlatforms, updatePlatformStatus, patchPlatform,
   // announcements
   findExisting, upsertAnnouncement, listAnnouncements, getAnnouncement,
-  patchAnnouncementReview, patchAnnouncementScope, markReviewed,
+  patchAnnouncementReview, patchAnnouncementScope, patchAnnouncementQual, markReviewed,
   // feedback logs
   writeScopeErrorLog, writeQualErrorLog, writeFeedbackLogs,
   listScopeErrorLogs, listQualErrorLogs, resolveScopeError, getErrorLogCounts,

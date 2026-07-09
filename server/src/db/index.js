@@ -32,6 +32,12 @@ function migrate() {
     db.exec("ALTER TABLE qual_rules ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
   }
 
+  // announcements.qual_tags 列（loop 4: 资质自迭代回写公告用）
+  const annCols = db.prepare('PRAGMA table_info(announcements)').all().map((c) => c.name);
+  if (!annCols.includes('qual_tags')) {
+    db.exec("ALTER TABLE announcements ADD COLUMN qual_tags TEXT");
+  }
+
   // AI 沉淀去重索引：partial UNIQUE on (tag, keywords) WHERE source='ai-learned'
   // 必须在 source 列就位之后；schema.sql 的 IF NOT EXISTS 不够（老库没列就 fail）
   db.exec(

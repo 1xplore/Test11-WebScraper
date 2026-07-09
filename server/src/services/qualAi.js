@@ -204,6 +204,21 @@ async function learnQualFromMiss(announcementId) {
 
   const finalTag = reconcileTagName(ai.tag, existingTags);
 
+  // F3 fix: QUAL_SCOPE 白名单 + existingTags 都是允许的；其它 AI 发明拒绝
+  const allowedTagSet = new Set([...QUAL_SCOPE, ...existingTags]);
+  if (!allowedTagSet.has(finalTag)) {
+    storage.writeQualErrorLog(
+      ann.id,
+      `ai_tag_outside_whitelist: ai.tag=${ai.tag} reconciled=${finalTag} reason=${ai.reason || ''}`
+    );
+    return {
+      applied: false,
+      reason: 'ai_tag_outside_whitelist',
+      message: `AI 提议的 tag "${finalTag}" 不在白名单（QUAL_SCOPE 27 项 + 现有规则 ${existingTags.length} 项）`,
+      suggestion: { tag: ai.tag, keywords: ai.keywords, reason: ai.reason, matchExisting: ai.matchExisting },
+    };
+  }
+
   let newRule;
   try {
     newRule = storage.createQualRule({
@@ -218,11 +233,16 @@ async function learnQualFromMiss(announcementId) {
       const existing = storage.listQualRules({ enabledOnly: true })
         .find((r) => r.source === AI_LEARNED_QUAL_SOURCE && r.tag === finalTag && r.keywords === verified.join('|'));
       if (!existing) throw e;
+      // F1 fix: 即便冲突（已存在规则），也回写 announcement.qual_tags 以让"自我覆盖"对用户可见
+      const newRules = storage.listQualRules({ enabledOnly: true });
+      const refreshedQualTags = matching.inferQual(text, buildDynamicRules(newRules));
+      storage.patchAnnouncementQual(ann.id, refreshedQualTags);
       return {
         applied: true,
         rule: { id: existing.id, tag: existing.tag, keywords: verified, source: AI_LEARNED_QUAL_SOURCE, priority: AI_LEARNED_QUAL_PRIORITY },
         matchedExisting: !!ai.matchExisting,
         textSource,
+        qualTags: refreshedQualTags,
         reason: ai.reason || '',
         note: 'rule already exists (dedup by partial unique index)',
       };
@@ -230,13 +250,18 @@ async function learnQualFromMiss(announcementId) {
     throw e;
   }
 
-  matching.invalidateQualRulesCache();
+  // F1 fix: 规则入库后，重跑 inferQual 并回写 announcement.qual_tags
+  //         让"学一次 → 算法下次能自动覆盖"对用户可见
+  const freshRules = storage.listQualRules({ enabledOnly: true });
+  const refreshedQualTags = matching.inferQual(text, buildDynamicRules(freshRules));
+  storage.patchAnnouncementQual(ann.id, refreshedQualTags);
 
   return {
     applied: true,
     rule: { id: newRule.id, tag: finalTag, keywords: verified, source: AI_LEARNED_QUAL_SOURCE, priority: AI_LEARNED_QUAL_PRIORITY },
     matchedExisting: !!ai.matchExisting,
     textSource,
+    qualTags: refreshedQualTags,
     reason: ai.reason || '',
   };
 }

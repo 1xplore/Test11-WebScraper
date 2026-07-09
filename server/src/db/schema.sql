@@ -59,6 +59,7 @@ CREATE TABLE IF NOT EXISTS announcements (
 
   -- 自动推断字段（爬虫写入，人工不直接改）
   scope_tags            TEXT,                          -- JSON array（招标范围标签）
+  qual_tags             TEXT,                          -- JSON array（资质标签 —— 自迭代回写）
   business_match        TEXT,                          -- 主营业务可做 / 部分可做 / 不可做 / 待评估
   project_progress      TEXT,                          -- 公告中 / 报名截止 / 开标中 / 评标中 / 中标公示 / 已中标 / 已流标 / 已终止 / 已结束
   match_score           REAL,                          -- 综合匹配分（0~1，AI+算法）

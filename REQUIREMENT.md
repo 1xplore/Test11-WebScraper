@@ -55,7 +55,10 @@
 - [x] 详情页 AI 学一下按钮 (f2b1a5a, 2026-07-10)
 - [x] 真待评估公告端到端冒烟 (f2b1a5a, 2026-07-10)
 - [x] subagent 审计 + 缓存下沉 (f2b1a5a, 2026-07-10)
-- [ ] qual 自迭代（复用 learn）
+- [x] qual 服务（学习 + 白名单）(bb89745, 2026-07-10)
+- [x] qual_tags 回写（announcement）(pending-commit, 2026-07-10)
+- [x] qual 前端"AI 学资质"按钮 (bb89745, 2026-07-10)
+- [x] qual 审计修复（Loop 4）(pending-commit, 2026-07-10)
 - [ ] 后台 worker 自动批跑
 - [ ] dashboard 看 AI 沉淀规则命中率
 

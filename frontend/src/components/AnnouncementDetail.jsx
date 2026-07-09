@@ -117,6 +117,11 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
     try {
       const r = await fetcher.learnQualFromMiss(item.id);
       setLearnQualResult(r);
+      if (r.applied) {
+        const fresh = await fetcher.getAnnouncement(item.id);
+        setItem(fresh);
+        onChanged?.(fresh);
+      }
     } catch (e) {
       setLearnQualResult({ applied: false, error: e.message });
     } finally {
@@ -245,6 +250,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                 {learnQualResult?.applied && (
                   <span className="ml-3 text-success-fg">
                     沉淀成功：tag=<b>{learnQualResult.rule?.tag}</b>，关键词={JSON.stringify(learnQualResult.rule?.keywords)}
+                    {learnQualResult.qualTags ? ` · 本公告 tags=${JSON.stringify(learnQualResult.qualTags)}` : ''}
                     {learnQualResult.textSource ? ` · 源字段=${learnQualResult.textSource}` : ''}
                     {learnQualResult.reason ? ` · ${learnQualResult.reason}` : ''}
                   </span>
