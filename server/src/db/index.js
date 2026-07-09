@@ -21,6 +21,23 @@ db.pragma('synchronous = NORMAL');
 function migrate() {
   const sql = fs.readFileSync(SCHEMA_PATH, 'utf8');
   db.exec(sql);
+
+  // 增量迁移：给老库加缺失列（CREATE TABLE IF NOT EXISTS 不会给已存在的表补列）
+  // 列存在性查 PRAGMA table_info；不存在则 ALTER ADD COLUMN
+  const qualCols = db.prepare('PRAGMA table_info(qual_rules)').all().map((c) => c.name);
+  if (!qualCols.includes('source')) {
+    db.exec("ALTER TABLE qual_rules ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'");
+  }
+  if (!qualCols.includes('updated_at')) {
+    db.exec("ALTER TABLE qual_rules ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
+  }
+
+  // AI 沉淀去重索引：partial UNIQUE on (tag, keywords) WHERE source='ai-learned'
+  // 必须在 source 列就位之后；schema.sql 的 IF NOT EXISTS 不够（老库没列就 fail）
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS uniq_ai_learned_qual_tag_kw " +
+    "ON qual_rules(tag, keywords) WHERE source = 'ai-learned'"
+  );
 }
 
 migrate();

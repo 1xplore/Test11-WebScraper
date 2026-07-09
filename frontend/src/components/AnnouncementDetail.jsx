@@ -26,6 +26,8 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
   const [aiLoading, setAiLoading] = useState(false);
   const [learnResult, setLearnResult] = useState(null);
   const [learnLoading, setLearnLoading] = useState(false);
+  const [learnQualResult, setLearnQualResult] = useState(null);
+  const [learnQualLoading, setLearnQualLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
 
@@ -90,7 +92,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
   }
 
   async function runLearnFromMiss() {
-    if (!item || learnLoading) return;
+    if (!item || learnLoading || learnQualLoading) return;
     setLearnLoading(true);
     setLearnResult(null);
     try {
@@ -105,6 +107,20 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
       setLearnResult({ applied: false, error: e.message });
     } finally {
       setLearnLoading(false);
+    }
+  }
+
+  async function runLearnQualFromMiss() {
+    if (!item || learnLoading || learnQualLoading) return;
+    setLearnQualLoading(true);
+    setLearnQualResult(null);
+    try {
+      const r = await fetcher.learnQualFromMiss(item.id);
+      setLearnQualResult(r);
+    } catch (e) {
+      setLearnQualResult({ applied: false, error: e.message });
+    } finally {
+      setLearnQualLoading(false);
     }
   }
 
@@ -218,6 +234,36 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                 title="让 AI 判断此公告应归哪个 tag、并沉淀让算法自动覆盖此类的关键词"
               >
                 {learnLoading ? '学习中…' : 'AI 学一下'}
+              </Button>
+            </div>
+
+            {/* AI 学一下（资质） —— 自迭代：让 AI 提议本公告要求的资质类别 + 沉淀 qual_rules */}
+            <div className="ai-banner mt-2" style={{ borderColor: 'var(--accent)' }}>
+              <div>
+                <Brain className="h-3.5 w-3.5 inline mr-1 text-accent" />
+                <span className="ai-banner-text">AI 学一下（资质）</span>
+                {learnQualResult?.applied && (
+                  <span className="ml-3 text-success-fg">
+                    沉淀成功：tag=<b>{learnQualResult.rule?.tag}</b>，关键词={JSON.stringify(learnQualResult.rule?.keywords)}
+                    {learnQualResult.textSource ? ` · 源字段=${learnQualResult.textSource}` : ''}
+                    {learnQualResult.reason ? ` · ${learnQualResult.reason}` : ''}
+                  </span>
+                )}
+                {learnQualResult?.applied === false && learnQualResult?.message && (
+                  <span className="ml-3 text-warning-fg">{learnQualResult.message}</span>
+                )}
+                {learnQualResult?.applied === false && learnQualResult?.error && (
+                  <span className="ml-3 text-danger">{learnQualResult.error}</span>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={learnQualLoading}
+                onClick={runLearnQualFromMiss}
+                title="让 AI 从公告 requirement 中提炼资质类别、沉淀 qual_rules"
+              >
+                {learnQualLoading ? '学资质中…' : 'AI 学资质'}
               </Button>
             </div>
 

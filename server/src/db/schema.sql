@@ -113,8 +113,16 @@ CREATE TABLE IF NOT EXISTS qual_rules (
   tag             TEXT NOT NULL,
   keywords        TEXT NOT NULL,
   enabled         INTEGER NOT NULL DEFAULT 1,
-  created_at      TEXT NOT NULL DEFAULT (datetime('now'))
+  source          TEXT NOT NULL DEFAULT 'manual',       -- seed / manual / imported / ai-learned
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE INDEX IF NOT EXISTS idx_qual_priority ON qual_rules(priority);
+
+-- AI 沉淀的资质规则去重（partial index，对应 source='ai-learned'）
+-- 索引创建必须在 qual_rules.source 列存在之后；老库迁移见 db/index.js#migrate()
+-- 新装本文件 IF NOT EXISTS 会自动建好（前提 schema 中已含 source 列）
 
 -- ---------- Scope 错误日志（替代 Notion SCOPE_ERROR_LOG_DB） ----------
 CREATE TABLE IF NOT EXISTS scope_error_logs (

@@ -375,6 +375,41 @@ function invalidateScopeRulesCache() {
   try { _scopeRulesCacheInvalidator(); } catch (_) { /* bootstrap 阶段匹配未注册，静默 */ }
 }
 
+// ---------- 资质规则（qual_rules）—— 同 scope_rules 形态 + ai-learned 通道 ----------
+
+function listQualRules({ enabledOnly = false } = {}) {
+  const sql = enabledOnly
+    ? 'SELECT * FROM qual_rules WHERE enabled = 1 ORDER BY priority ASC'
+    : 'SELECT * FROM qual_rules ORDER BY priority ASC';
+  return db.prepare(sql).all();
+}
+
+function patchQualRule(id, patch) {
+  const allowed = ['priority', 'tag', 'keywords', 'enabled'];
+  const fields = Object.entries(patch).filter(([k]) => allowed.includes(k));
+  if (fields.length === 0) return null;
+  const sql = `UPDATE qual_rules SET ${fields.map(([k]) => `${k} = ?`).join(', ')}, updated_at = datetime('now') WHERE id = ?`;
+  db.prepare(sql).run(...fields.map(([, v]) => v), id);
+  invalidateQualRulesCache();
+  return db.prepare('SELECT * FROM qual_rules WHERE id = ?').get(id);
+}
+
+function createQualRule({ priority, tag, keywords, enabled = 1, source = 'manual' }) {
+  const info = db.prepare(
+    'INSERT INTO qual_rules (priority, tag, keywords, enabled, source) VALUES (?, ?, ?, ?, ?)'
+  ).run(priority, tag, keywords, enabled ? 1 : 0, source);
+  invalidateQualRulesCache();
+  return db.prepare('SELECT * FROM qual_rules WHERE id = ?').get(info.lastInsertRowid);
+}
+
+let _qualRulesCacheInvalidator = () => {};
+function registerQualRulesCacheInvalidator(fn) {
+  if (typeof fn === 'function') _qualRulesCacheInvalidator = fn;
+}
+function invalidateQualRulesCache() {
+  try { _qualRulesCacheInvalidator(); } catch (_) { /* 同上 */ }
+}
+
 // ---------- 抓取运行日志 ----------
 
 function getLastScrapeTime() {
@@ -534,6 +569,9 @@ module.exports = {
   listScopeRules, patchScopeRule, createScopeRule,
   // cache invalidator registry
   registerScopeRulesCacheInvalidator, invalidateScopeRulesCache,
+  // qual rules
+  listQualRules, patchQualRule, createQualRule,
+  registerQualRulesCacheInvalidator, invalidateQualRulesCache,
   // scrape runs
   getLastScrapeTime, createScrapeRun, listScrapeRuns,
   // users

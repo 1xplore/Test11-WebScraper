@@ -128,6 +128,48 @@ try {
   storage.registerScopeRulesCacheInvalidator(invalidateScopeRulesCache);
 } catch (_) { /* 早期 bootstrap 阶段静默 */ }
 
+// ---------- 资质（qual_rules）正则匹配 —— 与 inferScope 同形态 ----------
+
+const _qualRulesCache = { value: null, at: 0 };
+function loadActiveQualRules() {
+  const now = Date.now();
+  if (_qualRulesCache.value && now - _qualRulesCache.at < 30_000) {
+    return _qualRulesCache.value;
+  }
+  const rows = storage.listQualRules({ enabledOnly: true });
+  const rules = rows.map((r) => ({
+    priority: r.priority,
+    tag: r.tag,
+    regex: compileKeywords(r.keywords),
+  }));
+  _qualRulesCache.value = rules;
+  _qualRulesCache.at = now;
+  return rules;
+}
+
+function invalidateQualRulesCache() {
+  _qualRulesCache.value = null;
+  _qualRulesCache.at = 0;
+}
+
+try {
+  storage.registerQualRulesCacheInvalidator(invalidateQualRulesCache);
+} catch (_) { /* bootstrap 阶段静默 */ }
+
+/**
+ * 给定文本（通常是 announcement.requirement），命中已有的 qual_rules 关键词即视为
+ * 该公告属于对应资质要求类别。未命中返回 ['未匹配']（区别于 ['其他']，便于 UI 显示）
+ */
+function inferQual(text, dynamicRules = null) {
+  const rules = dynamicRules || loadActiveQualRules();
+  if (!rules.length) return ['未匹配'];
+  const tags = [];
+  for (const r of rules) {
+    if (r.regex.test(text)) tags.push(r.tag);
+  }
+  return tags.length > 0 ? tags : ['未匹配'];
+}
+
 function compileKeywords(kwStr) {
   // 把 "EPC|设计施工总承包|设计采购施工|设计施工" → /EPC|设计施工总承包|设计采购施工|设计施工/
   // 同时清理空段、转义 regex 元字符
@@ -368,10 +410,12 @@ module.exports = {
   parseDate,
   extractDistrict,
   inferScope,
+  inferQual,
   inferBusinessMatch,
   inferProgress,
   compileKeywords,
   invalidateScopeRulesCache,
+  invalidateQualRulesCache,
   computeLocalScore,
   aiRefine,
   testAiConnection,
