@@ -51,17 +51,18 @@ app.get('/api/enums', (req, res) => {
   });
 });
 
+const { mutationsOnlyAuth } = require('./middleware/auth');
 app.use('/api/stats', statsRouter);
-app.use('/api/announcements', annRouter);
-app.use('/api/platforms', platRouter);
-app.use('/api/scope-rules', scopeRouter);
-app.use('/api/qual-rules', qualRouter);
-app.use('/api/notice-rules', noticeRouter);
+app.use('/api/announcements', mutationsOnlyAuth, annRouter);  // GET 开放 / 写入要 Bearer token
+app.use('/api/platforms', mutationsOnlyAuth, platRouter);
+app.use('/api/scope-rules', mutationsOnlyAuth, scopeRouter);
+app.use('/api/qual-rules', mutationsOnlyAuth, qualRouter);
+app.use('/api/notice-rules', mutationsOnlyAuth, noticeRouter);
 app.use('/api/scrape-runs', runsRouter);
-app.use('/api/error-logs', errLogsRouter);
-app.use('/api/scrape-trigger', triggerRouter);
-app.use('/api/auth', authRouter);
-app.use('/api/settings', settingsRouter);
+app.use('/api/error-logs', mutationsOnlyAuth, errLogsRouter);
+app.use('/api/scrape-trigger', mutationsOnlyAuth, triggerRouter);
+app.use('/api/auth', authRouter);                          // /login /me /users 都不需要 token
+app.use('/api/settings', mutationsOnlyAuth, settingsRouter);
 
 app.use((err, req, res, next) => {
   console.error('[api error]', err);
