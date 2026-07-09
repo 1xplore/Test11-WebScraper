@@ -63,6 +63,7 @@
 - [x] ruleLearner 审计修 + 单一源(loop6 commit, 2026-07-10)
 - [x] notice_type 第三套自迭代 (loop6 commit, 2026-07-10)
 - [x] 后台 worker 自动批跑 (loop12 commit, 2026-07-10)
+- [x] qual / notice_type seed 数据 (2b4711f, 2026-07-10)
 - [ ] dashboard 看 AI 沉淀规则命中率
 
 ## §6. 部署 / 运维（deployment）
