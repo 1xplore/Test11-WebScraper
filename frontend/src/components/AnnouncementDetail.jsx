@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Sparkles, ExternalLink, Check, X as XIcon, Eye, Pause, Trophy, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { Sparkles, ExternalLink, Check, X as XIcon, Eye, Pause, Trophy, ThumbsDown, ThumbsUp, Brain } from 'lucide-react';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose
 } from '@/components/ui/dialog';
@@ -24,6 +24,8 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
   const [loading, setLoading] = useState(false);
   const [aiResult, setAiResult] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
+  const [learnResult, setLearnResult] = useState(null);
+  const [learnLoading, setLearnLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
 
@@ -84,6 +86,25 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
       setAiResult({ error: e.message });
     } finally {
       setAiLoading(false);
+    }
+  }
+
+  async function runLearnFromMiss() {
+    if (!item || learnLoading) return;
+    setLearnLoading(true);
+    setLearnResult(null);
+    try {
+      const r = await fetcher.learnFromMiss(item.id);
+      setLearnResult(r);
+      if (r.applied) {
+        const fresh = await fetcher.getAnnouncement(item.id);
+        setItem(fresh);
+        onChanged?.(fresh);
+      }
+    } catch (e) {
+      setLearnResult({ applied: false, error: e.message });
+    } finally {
+      setLearnLoading(false);
     }
   }
 
@@ -168,6 +189,35 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
               </div>
               <Button size="sm" variant="ghost" disabled={aiLoading} onClick={runAiMatch}>
                 {aiLoading ? '计算中…' : '触发复核'}
+              </Button>
+            </div>
+
+            {/* AI 学一下 —— 自迭代：把当前规则学不到的公告交给 AI，沉淀规则 */}
+            <div className="ai-banner mt-2" style={{ borderColor: 'var(--accent)' }}>
+              <div>
+                <Brain className="h-3.5 w-3.5 inline mr-1 text-accent" />
+                <span className="ai-banner-text">AI 学一下（自迭代沉淀）</span>
+                {learnResult?.applied && (
+                  <span className="ml-3 text-success-fg">
+                    沉淀成功：tag=<b>{learnResult.rule?.tag}</b>，关键词={JSON.stringify(learnResult.rule?.keywords)}
+                    {learnResult.reason ? ` · ${learnResult.reason}` : ''}
+                  </span>
+                )}
+                {learnResult?.applied === false && learnResult?.message && (
+                  <span className="ml-3 text-warning-fg">{learnResult.message}</span>
+                )}
+                {learnResult?.applied === false && learnResult?.error && (
+                  <span className="ml-3 text-danger">{learnResult.error}</span>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={learnLoading}
+                onClick={runLearnFromMiss}
+                title="让 AI 判断此公告应归哪个 tag、并沉淀让算法自动覆盖此类的关键词"
+              >
+                {learnLoading ? '学习中…' : 'AI 学一下'}
               </Button>
             </div>
 

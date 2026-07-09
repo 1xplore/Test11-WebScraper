@@ -36,6 +36,7 @@ export const fetcher = {
     api.patch(`/announcements/${id}/review`, body).then((r) => r.data),
   markReviewed: (id) => api.post(`/announcements/${id}/reviewed`).then((r) => r.data),
   aiMatch: (id) => api.post(`/announcements/${id}/ai-match`).then((r) => r.data),
+  learnFromMiss: (id) => api.post('/scope-rules/learn-from-miss', { announcementId: id }).then((r) => r.data),
   listPlatforms: (params) =>
     api.get('/platforms', { params }).then((r) => r.data),
   patchPlatform: (scriptId, body) =>
@@ -57,6 +58,9 @@ export const fetcher = {
     api.get('/scrape-trigger/tasks').then((r) => r.data),
   getTriggerTask: (id) =>
     api.get(`/scrape-trigger/tasks/${id}`).then((r) => r.data),
+  getAiSettings: () => api.get('/settings/ai').then((r) => r.data),
+  saveAiSettings: (body) => api.put('/settings/ai', body).then((r) => r.data),
+  testAiSettings: (body) => api.post('/settings/ai/test', body).then((r) => r.data),
   exportCsvUrl: (params = {}) => {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v != null && v !== '')

@@ -1,7 +1,8 @@
 import React from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
-import { Bell, Settings2, Activity, Boxes, AlertTriangle } from 'lucide-react';
+import { Bell, Settings2, Activity, Boxes, AlertTriangle, SlidersHorizontal } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSettingsModal } from '@/context/SettingsModalContext';
 import Login from '@/components/Login.jsx';
 
 const navItems = [
@@ -13,6 +14,7 @@ const navItems = [
 ];
 
 export default function AppShell() {
+  const { openSettings } = useSettingsModal();
   return (
     <div className="app-shell">
       <header className="page-header">
@@ -42,7 +44,15 @@ export default function AppShell() {
               </NavLink>
             ))}
           </nav>
-          <div className="border-l border-rule pl-4 ml-1">
+          <div className="border-l border-rule pl-4 ml-1 flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => openSettings('ai-config')}
+              title="设置（AI 配置等）"
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md text-ink-muted hover:bg-surface-sunken hover:text-ink transition-colors"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+            </button>
             <Login />
           </div>
         </div>

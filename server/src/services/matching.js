@@ -118,6 +118,16 @@ function loadActiveScopeRules() {
   return rules;
 }
 
+function invalidateScopeRulesCache() {
+  _scopeRulesCache.value = null;
+  _scopeRulesCache.at = 0;
+}
+
+// 把本服务的 invalidator 注册到 storage 层 —— 任何对 scope_rules 的写都立刻失效缓存
+try {
+  storage.registerScopeRulesCacheInvalidator(invalidateScopeRulesCache);
+} catch (_) { /* 早期 bootstrap 阶段静默 */ }
+
 function compileKeywords(kwStr) {
   // 把 "EPC|设计施工总承包|设计采购施工|设计施工" → /EPC|设计施工总承包|设计采购施工|设计施工/
   // 同时清理空段、转义 regex 元字符
@@ -178,17 +188,26 @@ function computeLocalScore(scopeTags, title) {
  * 输入: { title, description, scopeTags }
  * 输出: { tags: string[], score: 0~1, reason: string }
  *
- * 环境变量：
- *   OPENAI_API_KEY    必填才启用；缺失时返回 null
+ * 配置读取：system_settings（UI 填）→ process.env（部署兜底）→ 内置默认。
+ * 每次 read-through，UI 改完立即生效。
+ *
+ * 环境变量（兜底用）：
+ *   OPENAI_API_KEY    缺失时回退到此
  *   OPENAI_BASE_URL   可选，默认 https://api.openai.com/v1
  *   OPENAI_MODEL      可选，默认 gpt-4o-mini
  *   AI_MATCH_TIMEOUT_MS  可选，默认 8000
  */
+const storage = require('../storage/adapter');
+
 async function aiRefine({ title, description, scopeTags }) {
-  const apiKey = process.env.OPENAI_API_KEY;
+  const apiKey = storage.getSetting('ai_api_key') || process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
-  const baseURL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-  const model = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+  const baseURL = storage.getSetting('ai_base_url')
+    || process.env.OPENAI_BASE_URL
+    || 'https://api.openai.com/v1';
+  const model = storage.getSetting('ai_model')
+    || process.env.OPENAI_MODEL
+    || 'gpt-4o-mini';
   const timeoutMs = parseInt(process.env.AI_MATCH_TIMEOUT_MS || '8000', 10);
 
   const systemPrompt = [
@@ -254,6 +273,47 @@ async function aiRefine({ title, description, scopeTags }) {
   }
 }
 
+/**
+ * 测试连通性：模拟一次最小请求，验 key + baseURL + model 是否能跑通
+ * 入参显式传入（不读 storage），让"未保存的草稿"也能测
+ * @param {{apiKey, baseURL, model, timeoutMs?}}
+ * @returns {Promise<{ok: boolean, error?: string, latencyMs?: number}>}
+ */
+async function testAiConnection({ apiKey, baseURL, model, timeoutMs }) {
+  if (!apiKey) return { ok: false, error: 'API Key 为空' };
+  const url = `${(baseURL || 'https://api.openai.com/v1').replace(/\/+$/, '')}/chat/completions`;
+  const modelName = model || 'gpt-4o-mini';
+  const t = timeoutMs || parseInt(process.env.AI_MATCH_TIMEOUT_MS || '8000', 10);
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), t);
+  const start = Date.now();
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      signal: ctrl.signal,
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: modelName,
+        messages: [{ role: 'user', content: 'ping' }],
+        max_tokens: 1,
+        temperature: 0,
+      }),
+    });
+    if (!res.ok) {
+      const body = (await res.text()).slice(0, 300);
+      return { ok: false, error: `HTTP ${res.status}: ${body}`, latencyMs: Date.now() - start };
+    }
+    return { ok: true, latencyMs: Date.now() - start };
+  } catch (e) {
+    return { ok: false, error: e.name === 'AbortError' ? `超时(${t}ms)` : e.message, latencyMs: Date.now() - start };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // ---------------- 混合入口 ----------------
 
 /**
@@ -310,8 +370,11 @@ module.exports = {
   inferScope,
   inferBusinessMatch,
   inferProgress,
+  compileKeywords,
+  invalidateScopeRulesCache,
   computeLocalScore,
   aiRefine,
+  testAiConnection,
   matchAnnouncement,
   loadActiveScopeRules,
 };

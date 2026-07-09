@@ -7,6 +7,7 @@ import ScopeRules from '@/pages/ScopeRules.jsx';
 import ScrapeRuns from '@/pages/ScrapeRuns.jsx';
 import ErrorLogs from '@/pages/ErrorLogs.jsx';
 import AppShell from '@/components/AppShell.jsx';
+import SettingsModal from '@/components/SettingsModal';
 
 export default function App() {
   return (
@@ -22,6 +23,7 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
+        <SettingsModal />
       </BrowserRouter>
     </TooltipProvider>
   );

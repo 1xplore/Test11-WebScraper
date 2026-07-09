@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { RefreshCw, Pencil, Check, X, Plus, Trash2 } from 'lucide-react';
+import { RefreshCw, Pencil, Check, X, Plus, Trash2, Sparkles } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ export default function ScopeRules() {
   const [rules, setRules] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filterTag, setFilterTag] = useState('');
+  const [filterSource, setFilterSource] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({});
   const [showCreate, setShowCreate] = useState(false);
@@ -73,8 +74,11 @@ export default function ScopeRules() {
     await load();
   }
 
-  const filtered = filterTag ? rules.filter((r) => r.tag === filterTag) : rules;
+  const filtered = rules
+    .filter((r) => !filterTag || r.tag === filterTag)
+    .filter((r) => !filterSource || r.source === filterSource);
   const uniqueTags = [...new Set(rules.map((r) => r.tag))].sort();
+  const sources = [...new Set(rules.map((r) => r.source))].sort();
 
   return (
     <div className="pb-12">
@@ -150,7 +154,7 @@ export default function ScopeRules() {
         )}
 
         {/* Tag filter chips */}
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="flex flex-wrap gap-2 mb-2">
           <button
             onClick={() => setFilterTag('')}
             className={`inline-flex items-center px-3 py-1.5 rounded-md text-xs font-medium border transition-colors ${
@@ -176,12 +180,52 @@ export default function ScopeRules() {
           ))}
         </div>
 
+        {/* Source filter chips (highlight AI-learned for self-growth mechanism) */}
+        <div className="flex flex-wrap gap-2 mb-4 items-center">
+          <span className="text-xs text-ink-subtle mr-1">来源：</span>
+          <button
+            onClick={() => setFilterSource('')}
+            className={`inline-flex items-center px-2.5 py-1 rounded text-xs font-mono border transition-colors ${
+              !filterSource
+                ? 'bg-ink text-canvas border-ink'
+                : 'bg-surface text-ink-muted border-rule hover:border-ink'
+            }`}
+          >
+            all
+          </button>
+          {sources.map((s) => {
+            const count = rules.filter((r) => r.source === s).length;
+            const isAi = s === 'ai-learned';
+            return (
+              <button
+                key={s}
+                onClick={() => setFilterSource(s)}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono border transition-colors ${
+                  filterSource === s
+                    ? isAi
+                      ? 'bg-accent text-accent-fg border-accent'
+                      : 'bg-ink text-canvas border-ink'
+                    : isAi
+                      ? 'bg-accent-soft text-accent border-accent/40 hover:border-accent'
+                      : 'bg-surface text-ink-muted border-rule hover:border-ink'
+                }`}
+                title={isAi ? 'AI 自迭代沉淀规则（priority 999，最后匹配）' : '系统 / 手工规则'}
+              >
+                <span>{s}</span>
+                <span className={filterSource === s ? 'opacity-80' : 'text-ink-subtle'}>({count})</span>
+                {isAi && <Sparkles className="h-3 w-3 inline-block" />}
+              </button>
+            );
+          })}
+        </div>
+
         <Card className="overflow-hidden">
           <table className="w-full text-sm">
             <thead className="bg-surface-sunken text-xs text-ink-muted">
               <tr>
                 <th className="text-left px-4 py-2.5 w-20 font-semibold">Priority</th>
                 <th className="text-left px-4 py-2.5 w-32 font-semibold">Tag</th>
+                <th className="text-left px-4 py-2.5 w-24 font-semibold">来源</th>
                 <th className="text-left px-4 py-2.5 font-semibold">关键词</th>
                 <th className="text-left px-4 py-2.5 w-24 font-semibold">Stop</th>
                 <th className="text-left px-4 py-2.5 w-24 font-semibold">状态</th>
@@ -190,9 +234,9 @@ export default function ScopeRules() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={6} className="text-center py-12 text-ink-muted">加载中…</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-ink-muted">加载中…</td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={6} className="text-center py-12 text-ink-muted">无匹配规则</td></tr>
+                <tr><td colSpan={7} className="text-center py-12 text-ink-muted">无匹配规则</td></tr>
               ) : filtered.map((r) => (
                 <tr key={r.id} className="border-t border-rule hover:bg-canvas transition-colors">
                   {editingId === r.id ? (
@@ -212,6 +256,11 @@ export default function ScopeRules() {
                           onChange={(e) => setEditForm({ ...editForm, tag: e.target.value })}
                           className="w-28 h-8 px-2 text-xs border-accent"
                         />
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <Badge variant={r.source === 'ai-learned' ? 'default' : 'muted'} className="capitalize">
+                          {r.source || '-'}
+                        </Badge>
                       </td>
                       <td className="px-3 py-2.5">
                         <Input
@@ -263,6 +312,15 @@ export default function ScopeRules() {
                     <>
                       <td className="px-4 py-2.5 font-mono text-xs text-ink tabular-nums">{r.priority}</td>
                       <td className="px-4 py-2.5"><Badge variant="outline">{r.tag}</Badge></td>
+                      <td className="px-4 py-2.5">
+                        <Badge
+                          variant={r.source === 'ai-learned' ? 'default' : 'muted'}
+                          className="font-mono uppercase tracking-wider"
+                          title={r.source === 'ai-learned' ? 'AI 自迭代沉淀规则 · priority 999' : '系统 / 手工规则'}
+                        >
+                          {r.source || '-'}
+                        </Badge>
+                      </td>
                       <td className="px-4 py-2.5 font-mono text-xs text-ink break-all">{r.keywords}</td>
                       <td className="px-4 py-2.5">
                         {r.stop_on_match ? <Badge variant="warning">停止</Badge> : <Badge variant="muted">累积</Badge>}

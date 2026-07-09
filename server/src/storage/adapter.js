@@ -227,6 +227,32 @@ function markReviewed(id) {
   return getAnnouncement(id);
 }
 
+/**
+ * 仅回写 AI 自动重算的字段（不影响 review_status / review_note 等人工字段）
+ * scope_tags 写成 JSON 字符串以匹配 toJsonArray 格式
+ */
+function patchAnnouncementScope(id, { scope_tags, business_match, match_score } = {}) {
+  const updates = [];
+  const params = [];
+  if (scope_tags !== undefined) {
+    updates.push('scope_tags = ?');
+    params.push(toJsonArray(scope_tags));
+  }
+  if (business_match !== undefined) {
+    updates.push('business_match = ?');
+    params.push(business_match);
+  }
+  if (match_score !== undefined) {
+    updates.push('match_score = ?');
+    params.push(match_score);
+  }
+  if (updates.length === 0) return null;
+  updates.push('updated_at = datetime(\'now\')');
+  params.push(id);
+  db.prepare(`UPDATE announcements SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  return getAnnouncement(id);
+}
+
 // ---------- 反馈日志 ----------
 
 function writeScopeErrorLog(announcementId, rawText) {
@@ -327,6 +353,7 @@ function patchScopeRule(id, patch) {
   if (fields.length === 0) return null;
   const sql = `UPDATE scope_rules SET ${fields.map(([k]) => `${k} = ?`).join(', ')}, updated_at = datetime('now') WHERE id = ?`;
   db.prepare(sql).run(...fields.map(([, v]) => v), id);
+  invalidateScopeRulesCache();  // 立刻让下次 inferScope 看到
   return db.prepare('SELECT * FROM scope_rules WHERE id = ?').get(id);
 }
 
@@ -334,7 +361,18 @@ function createScopeRule({ priority, tag, keywords, stop_on_match = 0, enabled =
   const info = db.prepare(
     'INSERT INTO scope_rules (priority, tag, keywords, stop_on_match, enabled, source) VALUES (?, ?, ?, ?, ?, ?)'
   ).run(priority, tag, keywords, stop_on_match ? 1 : 0, enabled ? 1 : 0, source);
+  invalidateScopeRulesCache();  // 立刻让下次 inferScope 看到
   return db.prepare('SELECT * FROM scope_rules WHERE id = ?').get(info.lastInsertRowid);
+}
+
+// 拉在适配层做：所有 scope_rules 写路径都强制失效缓存。
+// matching.js 提供 invalidator；adapter 不在顶部 require 避免循环依赖。
+let _scopeRulesCacheInvalidator = () => {};
+function registerScopeRulesCacheInvalidator(fn) {
+  if (typeof fn === 'function') _scopeRulesCacheInvalidator = fn;
+}
+function invalidateScopeRulesCache() {
+  try { _scopeRulesCacheInvalidator(); } catch (_) { /* bootstrap 阶段匹配未注册，静默 */ }
 }
 
 // ---------- 抓取运行日志 ----------
@@ -438,17 +476,64 @@ function getStats() {
   };
 }
 
+// ---------- 系统设置 ----------
+// 单租户，不做 per-tenant override；调用方负责 key 白名单。
+// secrets 类 key（ai_api_key）：GET 不返原值，setSetting 由路由 call。
+
+const SECRET_KEYS = new Set(['ai_api_key']);
+
+function getSetting(key) {
+  const row = db.prepare('SELECT setting_value FROM system_settings WHERE setting_key = ?').get(key);
+  if (!row) return null;
+  return row.setting_value || '';
+}
+
+function listSettings() {
+  return db.prepare('SELECT setting_key, setting_value, updated_at FROM system_settings ORDER BY setting_key').all()
+    .map((r) => ({
+      key: r.setting_key,
+      value: SECRET_KEYS.has(r.setting_key) ? '' : r.setting_value,  // 真值不返
+      hasValue: !!(r.setting_value && r.setting_value.length > 0),
+      updatedAt: r.updated_at,
+      isSecret: SECRET_KEYS.has(r.setting_key),
+    }));
+}
+
+function setSetting(key, value, userId = null) {
+  db.prepare(
+    `INSERT INTO system_settings (setting_key, setting_value, description, updated_at, updated_by)
+     VALUES (?, ?, NULL, datetime('now'), ?)
+     ON CONFLICT(setting_key) DO UPDATE SET
+       setting_value = excluded.setting_value,
+       updated_at    = datetime('now'),
+       updated_by    = excluded.updated_by`
+  ).run(key, value ?? '', userId);
+}
+
+function deleteSetting(key) {
+  db.prepare('DELETE FROM system_settings WHERE setting_key = ?').run(key);
+}
+
+function maskApiKey(v) {
+  if (!v) return '';
+  const s = String(v);
+  if (s.length <= 8) return '****';
+  return `${s.slice(0, 3)}...${s.slice(-4)}`;
+}
+
 module.exports = {
   // platforms
   getPlatformByScriptId, listPlatforms, updatePlatformStatus, patchPlatform,
   // announcements
   findExisting, upsertAnnouncement, listAnnouncements, getAnnouncement,
-  patchAnnouncementReview, markReviewed,
+  patchAnnouncementReview, patchAnnouncementScope, markReviewed,
   // feedback logs
   writeScopeErrorLog, writeQualErrorLog, writeFeedbackLogs,
   listScopeErrorLogs, listQualErrorLogs, resolveScopeError, getErrorLogCounts,
   // scope rules
   listScopeRules, patchScopeRule, createScopeRule,
+  // cache invalidator registry
+  registerScopeRulesCacheInvalidator, invalidateScopeRulesCache,
   // scrape runs
   getLastScrapeTime, createScrapeRun, listScrapeRuns,
   // users
@@ -457,4 +542,6 @@ module.exports = {
   getStats,
   // util
   rowToAnnouncement, fromJsonArray,
+  // settings
+  getSetting, listSettings, setSetting, deleteSetting, maskApiKey,
 };

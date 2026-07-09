@@ -101,6 +101,11 @@ CREATE TABLE IF NOT EXISTS scope_rules (
 
 CREATE INDEX IF NOT EXISTS idx_scope_priority ON scope_rules(priority);
 
+-- 同 tag + 同 keywords 的 AI 沉淀规则去重（partial index：只对 source='ai-learned' 生效）
+-- 普通 seed/manual/imported 行的重复由业务决定，不强制唯一
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_ai_learned_tag_kw
+  ON scope_rules(tag, keywords) WHERE source = 'ai-learned';
+
 -- ---------- 资质规则（预留，当前代码未读取但表已建） ----------
 CREATE TABLE IF NOT EXISTS qual_rules (
   id              INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -161,3 +166,20 @@ CREATE TABLE IF NOT EXISTS users (
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_token ON users(token);
+
+-- ---------- 系统设置（AI 配置等运维可改项） ----------
+-- 单租户，跳过 enterprise_settings。key 真值（如 ai_api_key）通过 GET 路由脱敏，只返 hasApiKey。
+CREATE TABLE IF NOT EXISTS system_settings (
+  setting_key     TEXT PRIMARY KEY,
+  setting_value   TEXT,
+  description     TEXT,
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_by      INTEGER REFERENCES users(id)
+);
+
+-- 种子：首次启动给默认配置。后续 PUT 会覆盖。
+INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description) VALUES
+  ('ai_provider', 'openai-compatible', 'AI 提供方（当前仅 OpenAI-compatible，base_url 自定义）'),
+  ('ai_api_key',  '',                  'AI API Key（plain text；GET 不返回原值）'),
+  ('ai_base_url', 'https://api.openai.com/v1', 'Chat Completions 端点 base URL'),
+  ('ai_model',    'gpt-4o-mini',       '模型名');
