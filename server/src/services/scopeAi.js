@@ -1,99 +1,30 @@
 /**
- * 自迭代匹配机制 —— AI 学一次、沉淀成规则
+ * 自迭代匹配机制 —— AI 学一次、沉淀成 scope_rules
  *
  * 入口：learnFromMiss(announcementId)
  *
- * 流程：
+ * 流程（loop 5 重构后）：
  *   1) 拉公告 + 读现有 enabled scope_rules
- *   2) 拼 prompt → 调 LLM（OpenAI-compatible，配置见 system_settings）
- *   3) 验证 AI 给出的 keywords 都字面命中文本
- *   4) 创建 scope_rules 行（priority=999, source='ai-learned'）
- *   5) 失效缓存 + 重算公告的 scope_tags / business_match + 写回
+ *   2) 拼 prompt → 调 LLM（ruleLearner.callOpenAI）
+ *   3) AI 返回 -> ruleLearner.verifyKeywords 字面验证
+ *   4) ruleLearner.reconcileWithWhitelist 强制 IN_SCOPE ∪ existingTags
+ *   5) ruleLearner.checkAlreadyCovered 尊重 ai.matchExisting
+ *   6) 创建 scope_rules（priority=999, source='ai-learned'）
+ *   7) adapter 失效缓存 + 重算 scope_tags / business_match + 写回
  *
- * 失败模式（不抛异常，统一走返回值）：
- *   - no_ai_key           AI 未配置
- *   - ai_call_failed      LLM 调用挂掉（写 scope_error_logs）
- *   - ai_bad_shape        返回值 JSON 字段缺失（写错误日志）
- *   - ai_no_verifiable    keywords 全是幻觉（写错误日志）
+ * 失败模式统一走返回值，与 v1 一致
  */
 
 const storage = require('../storage/adapter');
 const matching = require('./matching');
+const ruleLearner = require('./ruleLearner');
 
 const AI_LEARNED_PRIORITY = 999;
 const AI_LEARNED_SOURCE = 'ai-learned';
 
-function tagNormalize(s) {
-  return String(s || '')
-    .normalize('NFKC')               // 繁/简/全角半角归一
-    .replace(/\s+/g, '')             // 去空白
-    .toLowerCase();
-}
-
-/**
- * 把 AI 给的 tag 名归一化到已有 tag —— 简单的包含匹配
- * 优先 exact，其次 A 含 B 或 B 含 A（任一方向）
- */
-function reconcileTagName(aiTag, existingTags) {
-  if (!aiTag) return null;
-  const norm = tagNormalize(aiTag);
-  const exact = existingTags.find((t) => tagNormalize(t) === norm);
-  if (exact) return exact;
-  const contains = existingTags.find(
-    (t) => tagNormalize(t).includes(norm) || norm.includes(tagNormalize(t))
-  );
-  return contains || aiTag.trim();
-}
-
-function buildDynamicRules(rows) {
-  return rows.map((r) => ({
-    priority: r.priority,
-    tag: r.tag,
-    regex: matching.compileKeywords(r.keywords),
-    stopOnMatch: !!r.stop_on_match,
-  }));
-}
-
-async function callOpenAI({ apiKey, baseURL, model, systemPrompt, userPrompt, timeoutMs }) {
-  const url = `${baseURL.replace(/\/+$/, '')}/chat/completions`;
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, {
-      method: 'POST',
-      signal: ctrl.signal,
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.1,
-        response_format: { type: 'json_object' },
-      }),
-    });
-    if (!res.ok) {
-      const body = (await res.text()).slice(0, 200);
-      throw new Error(`HTTP ${res.status}: ${body}`);
-    }
-    const data = await res.json();
-    const content = data.choices?.[0]?.message?.content;
-    if (!content) throw new Error('empty response');
-    return JSON.parse(content);
-  } finally {
-    clearTimeout(timer);
-  }
-}
-
 async function learnFromMiss(announcementId) {
   const ann = storage.getAnnouncement(announcementId);
-  if (!ann) {
-    return { applied: false, reason: 'announcement_not_found' };
-  }
+  if (!ann) return { applied: false, reason: 'announcement_not_found' };
 
   const apiKey = storage.getSetting('ai_api_key') || process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -112,7 +43,6 @@ async function learnFromMiss(announcementId) {
 
   const existingRules = storage.listScopeRules({ enabledOnly: true });
   const existingTags = [...new Set(existingRules.map((r) => r.tag))];
-  // tag count 仅作信号，不传关键词全文（控制 prompt 体量 + 防 AI 误把老 seed 当 canonical）
   const tagCounts = existingTags
     .map((t) => ({ tag: t, n: existingRules.filter((r) => r.tag === t).length }))
     .sort((a, b) => b.n - a.n)
@@ -135,7 +65,7 @@ async function learnFromMiss(announcementId) {
     '硬约束：',
     '- keywords **必须字面命中**公告正文（不能造词、不能改写、不能是同义词）',
     '- 每个关键词 2~6 字，2~4 个足够（单字容易误命中，禁止）',
-    '- 已有 tag 能用就用现有（matchExisting: true），不要凭空创造同义 tag',
+    '- tag 须在主营/不可做 tag 集合或现有清单内，不要凭空发明同义 tag',
     '- 不要解释、不要寒暄，只返回 JSON',
   ].join('\n');
 
@@ -148,7 +78,7 @@ async function learnFromMiss(announcementId) {
   // 1) AI 调用
   let ai;
   try {
-    ai = await callOpenAI({
+    ai = await ruleLearner.callOpenAI({
       apiKey, baseURL, model,
       systemPrompt, userPrompt,
       timeoutMs: parseInt(process.env.AI_LEARN_TIMEOUT_MS || '15000', 10),
@@ -158,17 +88,13 @@ async function learnFromMiss(announcementId) {
     return { applied: false, reason: 'ai_call_failed', error: e.message };
   }
 
-  // 2) 校验返回结构
   if (!ai || typeof ai !== 'object' || typeof ai.tag !== 'string' || !Array.isArray(ai.keywords)) {
     storage.writeScopeErrorLog(ann.id, `ai_bad_shape: ${JSON.stringify(ai).slice(0, 500)}`);
     return { applied: false, reason: 'ai_bad_shape' };
   }
 
-  // 3) 关键词全字面命中验证（任何不在文本里的丢掉；全丢光就失败）
-  const verified = (ai.keywords || [])
-    .filter((kw) => typeof kw === 'string' && kw.length >= 2 && kw.length <= 30)
-    .filter((kw) => text.includes(kw));
-
+  // 2) 关键词字面验证（ruleLearner 内统一 minLen=2）
+  const verified = ruleLearner.verifyKeywords(ai.keywords, text);
   if (verified.length === 0) {
     storage.writeScopeErrorLog(
       ann.id,
@@ -181,10 +107,44 @@ async function learnFromMiss(announcementId) {
     };
   }
 
-  // 4) tag 归一化（避免 AI 说"审计"、系统已有"审计服务"造成两个 tag）
-  const finalTag = reconcileTagName(ai.tag, existingTags);
+  // 3) whitelist reconcile（修 loop 1 F6 / loop 3 F3 同款问题）
+  const wl = ruleLearner.reconcileWithWhitelist(ai.tag, {
+    whitelist: [...matching.IN_SCOPE, ...matching.OUT_OF_SCOPE],
+    existingTags,
+  });
+  if (!wl.allowed) {
+    storage.writeScopeErrorLog(
+      ann.id,
+      `ai_tag_outside_whitelist: ai.tag=${ai.tag} reconciled=${wl.finalTag}`
+    );
+    return {
+      applied: false,
+      reason: 'ai_tag_outside_whitelist',
+      message: `AI 提议的 tag "${wl.finalTag}" 不在白名单（IN/OUT_SCOPE 共 ${matching.IN_SCOPE.size + matching.OUT_OF_SCOPE.size} 项 + 现有 ${existingTags.length} 项）`,
+      suggestion: { tag: ai.tag, keywords: ai.keywords, reason: ai.reason },
+    };
+  }
+  const finalTag = wl.finalTag;
 
-  // 5) 落库（partial UNIQUE index 兜底并发去重，撞重了返回现有规则）
+  // 4) 尊重 ai.matchExisting（loop 1 F6 修复）
+  const covered = ruleLearner.checkAlreadyCovered({
+    ai, text, existingRules, forTag: finalTag,
+  });
+  if (covered.covered) {
+    return {
+      applied: true,
+      note: 'already_covered',
+      coveredBy: { id: covered.hitRule.id, tag: covered.hitRule.tag },
+      matchedExisting: true,
+      newTags: matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true })),
+      businessMatch: matching.inferBusinessMatch(
+        matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true }))
+      ),
+      reason: ai.reason || '',
+    };
+  }
+
+  // 5) 落库（partial UNIQUE index 兜底并发去重）
   let newRule;
   try {
     newRule = storage.createScopeRule({
@@ -196,7 +156,6 @@ async function learnFromMiss(announcementId) {
       source: AI_LEARNED_SOURCE,
     });
   } catch (e) {
-    // SQLite UNIQUE constraint failed → 已被并发 / 二次学习写过
     if (/UNIQUE constraint failed/i.test(e.message || '')) {
       const existing = storage.listScopeRules({ enabledOnly: true })
         .find((r) => r.source === AI_LEARNED_SOURCE && r.tag === finalTag && r.keywords === verified.join('|'));
@@ -205,15 +164,9 @@ async function learnFromMiss(announcementId) {
         applied: true,
         rule: { id: existing.id, tag: existing.tag, keywords: verified, source: AI_LEARNED_SOURCE, priority: AI_LEARNED_PRIORITY },
         matchedExisting: !!ai.matchExisting,
-        newTags: matching.inferScope(
-          `${ann.title || ''}\n${ann.description || ann.raw_text || ''}`,
-          buildDynamicRules(storage.listScopeRules({ enabledOnly: true }))
-        ),
+        newTags: matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true })),
         businessMatch: matching.inferBusinessMatch(
-          matching.inferScope(
-            `${ann.title || ''}\n${ann.description || ann.raw_text || ''}`,
-            buildDynamicRules(storage.listScopeRules({ enabledOnly: true }))
-          )
+          matching.inferScope(text, ruleLearner.buildDynamicRules(existingRules, { withStopOnMatch: true }))
         ),
         reason: ai.reason || '',
         note: 'rule already exists (dedup by partial unique index)',
@@ -222,11 +175,10 @@ async function learnFromMiss(announcementId) {
     throw e;
   }
 
-  // 6) 失效缓存 + 重算
+  // 6) 失效缓存 + 重算 + 写回
   matching.invalidateScopeRulesCache();
   const freshRows = storage.listScopeRules({ enabledOnly: true });
-  const dynamicRules = buildDynamicRules(freshRows);
-  const newTags = matching.inferScope(text, dynamicRules);
+  const newTags = matching.inferScope(text, ruleLearner.buildDynamicRules(freshRows, { withStopOnMatch: true }));
   const businessMatch = matching.inferBusinessMatch(newTags);
 
   storage.patchAnnouncementScope(ann.id, {
