@@ -57,6 +57,29 @@ function migrate() {
     "CREATE UNIQUE INDEX IF NOT EXISTS uniq_ai_learned_qual_tag_kw " +
     "ON qual_rules(tag, keywords) WHERE source = 'ai-learned'"
   );
+
+  // Loop 17 修 loop 16 audit F1：UNIQUE 索引确保 INSERT OR IGNORE 真起作用
+  // 必须先清重复行（保留每组 MIN(id)）再建索引
+  db.exec(`
+    DELETE FROM qual_rules
+    WHERE source = 'seed' AND id NOT IN (
+      SELECT MIN(id) FROM qual_rules WHERE source = 'seed' GROUP BY tag
+    )
+  `);
+  db.exec(`
+    DELETE FROM notice_type_rules
+    WHERE source = 'seed' AND id NOT IN (
+      SELECT MIN(id) FROM notice_type_rules WHERE source = 'seed' GROUP BY tag
+    )
+  `);
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS uniq_seed_qual_tag " +
+    "ON qual_rules(tag) WHERE source = 'seed'"
+  );
+  db.exec(
+    "CREATE UNIQUE INDEX IF NOT EXISTS uniq_seed_notice_type_tag " +
+    "ON notice_type_rules(tag) WHERE source = 'seed'"
+  );
 }
 
 migrate();

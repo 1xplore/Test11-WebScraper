@@ -92,7 +92,7 @@ patchAnnouncementNoticeType(ann.id, inferNoticeType(...))
 ## 8. 后续拓展
 
 - NOTICE_TYPE_SCOPE 跟 server.js enums 共享单一源（项目级 refactor）
-- notice_type_rules seed 数据（按 8 类各 2~3 条，让 inferNoticeType 首次有意义）
+- notice_type_rules seed 数据（loop 16 ✅ 已落：7 条覆盖 enum 8 项（缺 '其他'——兜底无需关键词），UNIQUE 索引防 boot 重复 INSERT）
 - 后台 worker 自动批跑
 - 命中率 dashboard
 - 与 scraper 当前主字段 notice_type 投票合并（远期）

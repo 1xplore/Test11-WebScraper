@@ -112,7 +112,7 @@ POST /api/qual-rules/learn-from-miss {announcementId}
 
 ## 6. 后续拓展
 
-- `qual_rules` seed 数据（loop 7+ 待办）—— inferQual 首次命中是有意义的
+- `qual_rules` seed 数据（loop 16 ✅ 已落：18 条工程咨询/造价/监理/设计/勘察/招标代理/审计/评估，UNIQUE 索引防 boot 重复 INSERT）
 - 后台 worker 自动批跑 `qual_error_logs`
 - 资质规则的命中率 dashboard
 - /api/enums 暴露 QUAL_SCOPE 给前端（避免重复定义）
