@@ -397,8 +397,10 @@ function writeFeedbackLogs(items, results) {
 // Loop 14 抽通用层 _ruleOpsFactory —— 三套（scope/qual/notice_type）共用
 // 注意：保留同名导出 listXxxRules / patchXxxRule / createXxxRule 不破坏 matching.js / scopeAi / qualAi / noticeTypeAi / routes/* 的调用点
 
-function _ruleOpsFactory(tableName, { allowedCols, hasStopOnMatch = false, boolCols = ['enabled'] } = {}) {
+function _ruleOpsFactory(tableName, { allowedCols, boolCols = ['enabled'] } = {}) {
   const insertCols = allowedCols.filter((c) => c !== 'id');  // id 是自增
+  // boolSet 留作未来扩展位（按 col 名 selective 归一）；当前 toBoolInt 是全局 boolean→0/1
+  const _boolSet = new Set(boolCols || []);
   let invalidator = () => {};
   function registerCacheInvalidator(fn) {
     if (typeof fn === 'function') invalidator = fn;
@@ -415,20 +417,26 @@ function _ruleOpsFactory(tableName, { allowedCols, hasStopOnMatch = false, boolC
   }
 
   function patch(id, patch) {
-    const fields = Object.entries(patch).filter(([k]) => allowedCols.includes(k));
+    // 仅当 value 非 undefined 且 key 在白名单内（filter 掉 undefined 以避免 SQL 不必要的覆盖）
+    const fields = Object.entries(patch)
+      .filter(([k, v]) => allowedCols.includes(k) && v !== undefined);
     if (fields.length === 0) return null;
     const setClauses = fields.map(([k]) => `${k} = ?`).join(', ');
     const sql = `UPDATE ${tableName} SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`;
-    db.prepare(sql).run(...fields.map(([, v]) => toBoolInt(v, boolCols, fields)), id);
+    db.prepare(sql).run(...fields.map(([, v]) => toBoolInt(v)), id);
     invalidateCache();
     return db.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).get(id);
   }
 
   function create(fields) {
-    const colsToInsert = insertCols.filter((c) => c in fields);
+    // 仅取 caller 明确传的非 undefined 字段；schema DEFAULT 兜底其余（fix loop 15 audit F1）
+    const colsToInsert = insertCols.filter((c) => fields[c] !== undefined);
+    if (colsToInsert.length === 0) {
+      throw new Error(`create(${tableName}): no insertable columns provided`);
+    }
     const placeholders = colsToInsert.map(() => '?').join(', ');
     const sql = `INSERT INTO ${tableName} (${colsToInsert.join(', ')}) VALUES (${placeholders})`;
-    const info = db.prepare(sql).run(...colsToInsert.map((c) => toBoolInt(fields[c], boolCols, colsToInsert.map((x) => [c, fields[c]]))));
+    const info = db.prepare(sql).run(...colsToInsert.map((c) => toBoolInt(fields[c])));
     invalidateCache();
     return db.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).get(info.lastInsertRowid);
   }
@@ -436,12 +444,10 @@ function _ruleOpsFactory(tableName, { allowedCols, hasStopOnMatch = false, boolC
   return { list, patch, create, registerCacheInvalidator, invalidateCache };
 }
 
-// bool 列（stop_on_match / enabled）存 INTEGER 0/1；外部传 true/false 自动归一
-function toBoolInt(value, boolCols, _debugColumnsIgnored) {
-  if (typeof value !== 'boolean') return value;
-  if (!boolCols) return value;
-  // 调用方负责传 boolCols；这里默认所有 boolean 都转 0/1
-  return value ? 1 : 0;
+// boolean 列 (stop_on_match / enabled) 存 INTEGER 0/1；callers 当前直接传数字
+// 这里仅做兜底：意外传 boolean 时归一（fix loop 15 audit F2）
+function toBoolInt(value) {
+  return typeof value === 'boolean' ? (value ? 1 : 0) : value;
 }
 
 const scopeRulesOps = _ruleOpsFactory('scope_rules', {
