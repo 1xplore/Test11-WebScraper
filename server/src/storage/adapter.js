@@ -306,7 +306,7 @@ function backfillAnnouncementTags({ batchSize = 200, dryRun = false } = {}) {
       // 任意一边已填就跳过（avoid 覆盖 AI 学出的人工修过内容）
       const qualEmpty = !a.qual_tags || a.qual_tags === '[]' || a.qual_tags === '';
       const noticeEmpty = !a.notice_type_tags || a.notice_type_tags === '[]' || a.notice_type_tags === '';
-      if (!qualEmpty || !noticeEmpty) { skipped++; continue; }
+      if (qualEmpty && noticeEmpty) { skipped++; continue; }
 
       let updates, params;
       try {

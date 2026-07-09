@@ -28,21 +28,40 @@ const storage = require(path.join(PROJECT_DIR, 'server/src/storage/adapter'));
 function parseArgs(argv) {
   const opts = { batchSize: 200, dryRun: false };
   for (const a of argv.slice(2)) {
-    if (a === '--dry-run') opts.dryRun = true;
+    // Loop 20 F5: 大小写 + 空格 鲁棒
+    const lower = a.toLowerCase();
+    if (lower === '--dry-run' || lower === '--dryrun') opts.dryRun = true;
     else if (a.startsWith('--batch=')) opts.batchSize = parseInt(a.slice(8), 10);
+    else if (a.startsWith('--batch') && argv.indexOf(a) + 1 < argv.length) {
+      // --batch N (空格形式)
+      const next = argv[argv.indexOf(a) + 1];
+      const n = parseInt(next, 10);
+      if (!Number.isNaN(n)) opts.batchSize = n;
+    }
   }
   return opts;
 }
 
 (async () => {
   const opts = parseArgs(process.argv);
+  // Loop 20 F2: batchSize 必须 ≥ 1，否则致命
+  if (!Number.isInteger(opts.batchSize) || opts.batchSize < 1) {
+    console.error(`[backfill-tags] FATAL batchSize=${opts.batchSize} -- 必须 ≥ 1`);
+    process.exit(2);
+  }
   console.log(`[backfill-tags] start: batch=${opts.batchSize} dryRun=${opts.dryRun}`);
   const t0 = Date.now();
   try {
     const r = await storage.backfillAnnouncementTags({ batchSize: opts.batchSize, dryRun: opts.dryRun });
     const sec = ((Date.now() - t0) / 1000).toFixed(1);
     console.log(`[backfill-tags] done in ${sec}s`);
-    console.log(`[backfill-tags] total=${r.total} updated=${r.updated} skipped=${r.skipped} failed=${r.failed}`);
+    // Loop 20 F4: 真实更新数 vs dryRun 计数区分；F7: failed 时 exit 1
+    const updLabel = r.dryRun ? 'wouldUpdate' : 'updated';
+    console.log(`[backfill-tags] total=${r.total} ${updLabel}=${r[updLabel]} skipped=${r.skipped} failed=${r.failed}`);
+    if (r.failed > 0) {
+      console.error(`[backfill-tags] FATAL ${r.failed} 行写库失败`);
+      process.exit(1);
+    }
     process.exit(0);
   } catch (e) {
     console.error(`[backfill-tags] FATAL ${e.message}`);
