@@ -270,7 +270,7 @@ INSERT OR IGNORE INTO qual_rules (priority, tag, keywords, source) VALUES
   (10, '市政公用工程监理甲级',   '市政公用工程监理甲级',                              'seed'),
   -- 评估 / 检测
   (10, '矿业权评估资质',         '矿业权评估资质',                                    'seed'),
-  (10, '测绘资质乙级',           '测绘资质',                                            'seed'),
+  (10, '测绘资质乙级',           '测绘资质乙级',                                        'seed'),
   (10, '安全评价资质',           '安全评价资质',                                        'seed'),
   (10, '环境监测资质',           '环境监测资质',                                        'seed'),
   -- 工程造价咨询企业
@@ -280,10 +280,7 @@ INSERT OR IGNORE INTO qual_rules (priority, tag, keywords, source) VALUES
   -- 中央投资代理
   (10, '中央投资招标代理',       '中央投资项目招标代理资格|中央投资招标代理',     'seed'),
   -- 工程咨询细分
-  (10, 'PPP咨询资质',            'PPP咨询|PPP',                                        'seed'),
-  (10, '全过程工程咨询',         '全过程工程咨询|全过程咨询',                        'seed'),
-  -- 总承包 / 设计施工
-  (10, '工程总承包资质',         '工程总承包资质|EPC总承包|EPC工程',                'seed');
+  (10, '全过程工程咨询',         '全过程工程咨询|全过程咨询',                        'seed');
 
 -- ---------- 公告类型种子（loop 16） —— 让 inferNoticeType 首次就有命中 ----------
 INSERT OR IGNORE INTO notice_type_rules (priority, tag, keywords, source) VALUES
