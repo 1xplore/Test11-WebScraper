@@ -205,15 +205,57 @@ cd frontend && npm run dev
 
 ---
 
-## Roadmap（后续可拓展）
+## Roadmap
 
-- [ ] 错误日志查看页（`/error-logs`）—— 闭环 scope/qual 匹配错误
-- [ ] scope 规则 Web 编辑（前端 inline 编辑 keywords / priority / enabled）
-- [ ] 前端"立即抓取"按钮（spawn `node main.js <site>` + 轮询 scrape_runs 进度）
-- [ ] AI 匹配端到端联调（OPENAI_API_KEY）
-- [ ] 看板增强（收藏 / 倒计时 / CSV 导出 / 按区域聚合）
-- [ ] 多用户与认证（token + reviewed_by 真实记录）
-- [ ] cron 改造（保持 5:00 AM，加 SQLite 存储结果查询接口）
+### 已完成（v2 运营闭环，2026-07-09）
+
+- [x] 错误日志查看页（`/error-logs`）—— 类型切换 + 一键建规则（自动提取关键词）
+- [x] scope 规则 Web 编辑（inline 编辑 + 新增表单 + 启用切换）
+- [x] 前端"立即抓取"按钮（spawn `node main.js <site>` + 轮询 task 状态）
+- [x] AI 业务复核（POST `/announcements/:id/ai-match`，可配 OPENAI_API_KEY，缺失时静默降级到本地算法）
+- [x] 看板增强：
+  - CSV 导出（25 列全字段 + Excel BOM）
+  - Deadline 倒计时（≤3 天红 / ≤7 天黄 / 其他灰）
+- [x] 多用户 token 认证（`users` 表 + localStorage token + reviewed_by 真实记录）
+- [x] UI 视觉升级（解决"黑白线稿"）：
+  - 卡片左侧按 business_match 染色的色条
+  - KPI 数字 28px + tabular-nums
+  - 字号/字重对比 + cv11 字体特性
+  - 入场 stagger 动画 + hover 微变
+- [x] Bug 修复（4 个 subagent code-review 发现）：
+  - `_jsonFields` 不再泄漏到 API 响应
+  - LIKE 查询改用 JSON.stringify 防 district/scopeTag 注入
+  - `markReviewed` 用 COALESCE 不覆盖 reviewed_at
+  - `AnnouncementDetail` useEffect 加 cancelled flag 防 race condition
+- [x] `getLastScrapeTime` 修复 `Invalid time value`（避免重复加 Z）
+
+### 待拓展（可优先做的方向）
+
+按 **价值 × 工作量** 排序：
+
+**高价值低成本**：
+- [ ] **cron 切换**：改造 `scripts/scheduled.js` 读 SQLite `platforms.enabled`，确保 5:00 AM 跑的平台与前端配置一致
+- [ ] **scraper 入库自动算 match_score**：当前 announcements.match_score 都是 null；让 storageRouter 上传时调 computeLocalScore
+- [ ] **聚合视图**：Dashboard 加按区域/平台分组的统计卡片（用 GROUP BY 查 announcements）
+- [ ] **AI 自动重算 pipeline**：每次抓取入库后批量调 AI 复核（异步 queue，不阻塞入库）
+
+**高价值中成本**：
+- [ ] **测试覆盖**：关键模块加 `node --test`：
+  - `matching.inferBusinessMatch` 各种 scope 组合
+  - `storage.upsertAnnouncement` 人工字段保护
+  - `routes/scrape-trigger` spawn + task 生命周期
+  - `routes/error-logs` resolveScopeError
+- [ ] **Notion 历史数据迁移**：写 `scripts/migrate-from-notion.js`，把 Notion DB 导出的 JSON 导入 SQLite（如果用户保留 Notion 备份）
+- [ ] **数据清理工具**：定期归档 `result_date < now - 90d AND review_status = 'Z.已中标'` 的记录到 `announcements_archive` 表
+- [ ] **HTTPS / 反向代理**：用 `node:https` + 自签证书或前置 nginx，前端绑 443
+
+**锦上添花（单人项目优先级低）**：
+- [ ] **密码认证**：当前是 token-only，加 bcrypt 哈希 + 登录页密码字段
+- [ ] **收藏 / 星标**：`announcements.starred` boolean + Dashboard 顶部"我的关注"快捷筛选
+- [ ] **PDF 单条导出**：用 puppeteer/playwright 渲染详情页 → PDF
+- [ ] **scraper 单元测试**：mock HTTP，每个 scraper 跑一组 fixture 验证字段映射
+- [ ] **监控告警**：cron 失败 / scrape_error > 阈值 → 发邮件/企业微信
+- [ ] **多语言**：i18n（zh-CN / en）支持海外项目
 
 ---
 
@@ -225,3 +267,28 @@ cd frontend && npm run dev
 - 前端入口：`frontend/src/main.jsx` → `App.jsx` → `pages/Dashboard.jsx`
 - 路由切换：`utils/storageRouter.js`
 - main.js：`main.js`（已加 `--storage` 参数）
+
+---
+
+## 本次开发日志（2026-07-08 ~ 09）
+
+**v1（commit `db640af`）：脱离 Notion，本地化全栈**
+- SQLite schema + seed（21 平台 + 27 scope 规则）
+- Express API 5 个路由 + 业务匹配（算法 + AI 混合）
+- 前端 Vite + React + shadcn/ui 9 组件 + 4 页面
+- main.js 加 `--storage=sqlite|notion` 参数
+
+**v2（commit `201e34a`）：完整运营闭环**
+- 错误日志查看页 + 一键建规则
+- scope 规则 Web 编辑
+- 前端"立即抓取"按钮
+- AI 业务复核（含 fallback）
+- CSV 导出 + deadline 倒计时
+- 多用户 token 认证
+- UI 视觉升级（解决"黑白线稿"）
+- 4 个 bug 修复（code-review 发现）
+
+**累计：**
+- 后端：~1500 行（server/src/）
+- 前端：~2500 行（frontend/src/）
+- 总 commit 数：2（本地，未推服务器）
