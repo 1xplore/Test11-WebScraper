@@ -220,3 +220,45 @@ INSERT OR IGNORE INTO system_settings (setting_key, setting_value, description) 
   ('ai_api_key',  '',                  'AI API Key（plain text；GET 不返回原值）'),
   ('ai_base_url', 'https://api.openai.com/v1', 'Chat Completions 端点 base URL'),
   ('ai_model',    'gpt-4o-mini',       '模型名');
+
+-- ---------- 资质种子（loop 16） —— 让 inferQual 首次调用就有命中 ----------
+-- 仅填空表（用 source='seed'）；已有行不动；human-edited source='manual' 行也不动
+-- keywords 用整词组（NOT 拆分），因为 platform 关键词 regex 是 OR 语义：
+--   拆分 "工程咨询|甲级" 会让 "工程咨询" 单独命中所有级别
+--   整词 "工程咨询甲级" 才精确到级别（OR 语义下仍是 substring 匹配，自我场景稳健）
+INSERT OR IGNORE INTO qual_rules (priority, tag, keywords, source) VALUES
+  -- 工程咨询（整词缩到级别）
+  (10, '工程咨询甲级',            '工程咨询甲级',  'seed'),
+  (10, '工程咨询乙级',            '工程咨询乙级',  'seed'),
+  (10, '工程咨询丙级',            '工程咨询丙级',  'seed'),
+  -- 工程造价咨询
+  (10, '工程造价咨询甲级',        '工程造价咨询甲级', 'seed'),
+  (10, '工程造价咨询乙级',        '工程造价咨询乙级', 'seed'),
+  -- 工程监理
+  (10, '工程监理甲级',            '工程监理甲级',  'seed'),
+  (10, '工程监理乙级',            '工程监理乙级',  'seed'),
+  (10, '工程监理丙级',            '工程监理丙级',  'seed'),
+  -- 工程设计
+  (10, '工程设计甲级',            '工程设计甲级',  'seed'),
+  (10, '工程设计乙级',            '工程设计乙级',  'seed'),
+  -- 工程勘察
+  (10, '工程勘察甲级',            '工程勘察甲级',  'seed'),
+  (10, '工程勘察乙级',            '工程勘察乙级',  'seed'),
+  -- 招标代理
+  (10, '工程招标代理甲级',        '工程招标代理甲级', 'seed'),
+  (10, '工程招标代理乙级',        '工程招标代理乙级', 'seed'),
+  -- 审计 / 评估
+  (10, '会计师事务所执业证书',     '会计师事务所执业证书', 'seed'),
+  (10, '审计资质',               '审计资质',        'seed'),
+  (10, '房地产估价资质',         '房地产估价资质',   'seed'),
+  (10, '土地评估资质',           '土地评估资质',     'seed');
+
+-- ---------- 公告类型种子（loop 16） —— 让 inferNoticeType 首次就有命中 ----------
+INSERT OR IGNORE INTO notice_type_rules (priority, tag, keywords, source) VALUES
+  (10, '采购公告',         '采购公告',                                 'seed'),
+  (10, '招标公告',         '招标公告',                                 'seed'),
+  (10, '资格预审公告',     '资格预审公告',                             'seed'),
+  (10, '竞争性磋商公告',   '竞争性磋商公告',                           'seed'),
+  (10, '公开招标',         '公开招标',                                 'seed'),
+  (10, '公开公告',         '公开公告',                                 'seed'),
+  (10, '竞争性磋商',       '竞争性磋商',                               'seed');
