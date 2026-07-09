@@ -48,13 +48,13 @@
 > 详情：[requirement/self-growth-scope-matching.md](./requirement/self-growth-scope-matching.md)
 > 状态随提交更新，已完项附 commit hash 日期
 
-- [x] scopeAi 服务（AI 提关键词）
-- [x] 路由 POST /scope-rules/learn
-- [x] source='ai-learned' + 部分唯一索引
-- [x] 关键词字面验证（防幻觉）
-- [x] 详情页 AI 学一下按钮
-- [x] 真待评估公告端到端冒烟
-- [x] subagent 审计 + 缓存下沉
+- [x] scopeAi 服务（AI 提关键词）(f2b1a5a, 2026-07-10)
+- [x] 路由 POST /scope-rules/learn (f2b1a5a, 2026-07-10)
+- [x] source='ai-learned' + 部分唯一索引 (f2b1a5a, 2026-07-10)
+- [x] 关键词字面验证（防幻觉） (f2b1a5a, 2026-07-10)
+- [x] 详情页 AI 学一下按钮 (f2b1a5a, 2026-07-10)
+- [x] 真待评估公告端到端冒烟 (f2b1a5a, 2026-07-10)
+- [x] subagent 审计 + 缓存下沉 (f2b1a5a, 2026-07-10)
 - [ ] qual 自迭代（复用 learn）
 - [ ] 后台 worker 自动批跑
 - [ ] dashboard 看 AI 沉淀规则命中率
