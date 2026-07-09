@@ -1,7 +1,7 @@
 # 自迭代资质匹配（self-growth qual matching）
 
 > **原始需求**（来源：用户在 loop 3 凌晨会话提出"拓展到资质匹配"）。
-> 同步登记到根 [REQUIREMENT.md §5.3](../REQUIREMENT.md#5-自迭代匹配机制) 跟踪状态。
+> 同步登记到根 [REQUIREMENT.md §5](../REQUIREMENT.md) 跟踪状态。
 
 ## 1. 一句话
 

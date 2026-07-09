@@ -286,6 +286,13 @@ function writeScopeErrorLog(announcementId, rawText) {
   ).run(announcementId, rawText).lastInsertRowid;
 }
 
+// Notice_type 错误日志（Loop 8 与 scope/qual 平行）
+function writeNoticeTypeErrorLog(announcementId, rawText) {
+  return db.prepare(
+    'INSERT INTO notice_type_error_logs (announcement_id, raw_text) VALUES (?, ?)'
+  ).run(announcementId, rawText).lastInsertRowid;
+}
+
 function writeQualErrorLog(announcementId, rawText) {
   return db.prepare(
     'INSERT INTO qual_error_logs (announcement_id, raw_text) VALUES (?, ?)'
@@ -623,7 +630,7 @@ module.exports = {
   findExisting, upsertAnnouncement, listAnnouncements, getAnnouncement,
   patchAnnouncementReview, patchAnnouncementScope, markReviewed,
   // feedback logs
-  writeScopeErrorLog, writeQualErrorLog, writeFeedbackLogs,
+  writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeFeedbackLogs,
   listScopeErrorLogs, listQualErrorLogs, resolveScopeError, getErrorLogCounts,
   // scope rules
   listScopeRules, patchScopeRule, createScopeRule,

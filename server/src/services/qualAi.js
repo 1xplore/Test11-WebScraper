@@ -142,18 +142,21 @@ async function learnQualFromMiss(announcementId) {
   }
   const finalTag = wl.finalTag;
 
-  // 尊重 ai.matchExisting（loop 1 F6 / loop 3 F6 同款问题）
+  // 尊重 ai.matchExisting（loop 1 F6 / loop 3 F6 / loop 6 F2 同款问题）
   const covered = ruleLearner.checkAlreadyCovered({
     ai, text, existingRules, forTag: finalTag,
   });
   if (covered.covered) {
+    // 已经覆盖：也回写 announcement.qual_tags 让用户看到状态
+    const refreshedQualTags = matching.inferQual(text, ruleLearner.buildDynamicRules(existingRules));
+    storage.patchAnnouncementQual(ann.id, refreshedQualTags);
     return {
       applied: true,
       note: 'already_covered',
       coveredBy: { id: covered.hitRule.id, tag: covered.hitRule.tag },
       matchedExisting: true,
       textSource,
-      qualTags: matching.inferQual(text, ruleLearner.buildDynamicRules(existingRules)),
+      qualTags: refreshedQualTags,
       reason: ai.reason || '',
     };
   }

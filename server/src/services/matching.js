@@ -15,6 +15,8 @@
  */
 
 const db = require('../db');
+const storage = require('../storage/adapter');
+const { compileKeywords } = require('./ruleLearner');
 
 // ---------------- 业务规则常量 ----------------
 
@@ -268,8 +270,7 @@ function computeLocalScore(scopeTags, title) {
  *   OPENAI_MODEL      可选，默认 gpt-4o-mini
  *   AI_MATCH_TIMEOUT_MS  可选，默认 8000
  */
-const storage = require('../storage/adapter');
-const { compileKeywords } = require('./ruleLearner');
+// storage + ruleLearner 已在文件顶部 require（修 loop 6 audit F1 BLOCKER —— TDZ）
 
 async function aiRefine({ title, description, scopeTags }) {
   const apiKey = storage.getSetting('ai_api_key') || process.env.OPENAI_API_KEY;

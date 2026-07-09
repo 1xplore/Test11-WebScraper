@@ -1,7 +1,7 @@
 # 自迭代公告类型匹配（self-growth notice-type）
 
 > **原始需求**（loop 6 用户原意："研究还有什么也可以适应这种'自主生长'的机制"）。
-> 同步登记到根 [REQUIREMENT.md §5.4](../REQUIREMENT.md)。
+> 同步登记到根 [REQUIREMENT.md §5](../REQUIREMENT.md)。
 
 ## 1. 一句话
 

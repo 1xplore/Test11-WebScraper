@@ -15,19 +15,18 @@
 const storage = require('../storage/adapter');
 const matching = require('./matching');
 const ruleLearner = require('./ruleLearner');
+const { NOTICE_TYPE_SCOPE } = require('../constants/aiEnums');
 
 const { AI_LEARNED_PRIORITY } = ruleLearner;
 const AI_LEARNED_NOTICE_TYPE_SOURCE = 'ai-learned';
 
-// 与 /api/enums 同步：公告类型当前 enum 值
-const NOTICE_TYPE_SCOPE = new Set([
-  '采购公告', '招标公告', '资格预审公告', '竞争性磋商公告',
-  '公开招标', '公开公告', '竞争性磋商', '其他',
-]);
+// NOTICE_TYPE_SCOPE 来源：constants/aiEnums.js（与 /api/enums 共享单一源）
 
 async function learnNoticeTypeFromMiss(announcementId) {
   const ann = storage.getAnnouncement(announcementId);
-  if (!ann) return { applied: false, reason: 'announcement_not_found' };
+  if (!ann) {
+    return { applied: false, reason: 'announcement_not_found', message: '公告不存在', error: 'announcement_not_found' };
+  }
 
   const apiKey = storage.getSetting('ai_api_key') || process.env.OPENAI_API_KEY;
   if (!apiKey) {
@@ -35,6 +34,7 @@ async function learnNoticeTypeFromMiss(announcementId) {
       applied: false,
       reason: 'no_ai_key',
       message: 'AI 未配置：Settings → AI 配置 填入 key 后再试',
+      error: 'no_ai_key',
     };
   }
   const baseURL = storage.getSetting('ai_base_url')
@@ -56,7 +56,7 @@ async function learnNoticeTypeFromMiss(announcementId) {
 
   const systemPrompt = [
     '你是工程咨询领域的招标公告分类专家。',
-    '公告类型 SCOPE: ' + [...NOTICE_TYPE_SCOPE].join('、'),
+    '公告类型 SCOPE: ' + NOTICE_TYPE_SCOPE.join('、'),
     '',
     `现有 notice_type_rules tag 清单（共 ${existingRules.length} 条规则）: ${tagCounts || '(无)'}`,
     '',
@@ -87,31 +87,44 @@ async function learnNoticeTypeFromMiss(announcementId) {
       timeoutMs: parseInt(process.env.AI_LEARN_TIMEOUT_MS || '15000', 10),
     });
   } catch (e) {
-    return { applied: false, reason: 'ai_call_failed', error: e.message };
+    storage.writeNoticeTypeErrorLog(ann.id, `ai_call_failed: ${e.message}`);
+    return { applied: false, reason: 'ai_call_failed', message: `AI 调用失败：${e.message}`, error: e.message };
   }
 
   if (!ai || typeof ai !== 'object' || typeof ai.tag !== 'string' || !Array.isArray(ai.keywords)) {
-    return { applied: false, reason: 'ai_bad_shape' };
+    storage.writeNoticeTypeErrorLog(ann.id, `ai_bad_shape: ${JSON.stringify(ai).slice(0, 500)}`);
+    return { applied: false, reason: 'ai_bad_shape', message: 'AI 返回格式异常，需重新尝试', error: 'ai_bad_shape' };
   }
 
   const verified = ruleLearner.verifyKeywords(ai.keywords, text);
   if (verified.length === 0) {
+    storage.writeNoticeTypeErrorLog(
+      ann.id,
+      `ai_no_verifiable: ai.tag=${ai.tag} ai.kw=${JSON.stringify(ai.keywords)} reason=${ai.reason || ''}`
+    );
     return {
       applied: false,
       reason: 'ai_no_verifiable',
+      message: 'AI 提议的关键词都不能字面命中本公告，请人工审核',
+      error: 'ai_no_verifiable',
       suggestion: { tag: ai.tag, keywords: ai.keywords, reason: ai.reason, matchExisting: ai.matchExisting },
     };
   }
 
   const wl = ruleLearner.reconcileWithWhitelist(ai.tag, {
-    whitelist: [...NOTICE_TYPE_SCOPE],
+    whitelist: NOTICE_TYPE_SCOPE,
     existingTags,
   });
   if (!wl.allowed) {
+    storage.writeNoticeTypeErrorLog(
+      ann.id,
+      `ai_tag_outside_whitelist: ai.tag=${ai.tag} reconciled=${wl.finalTag}`
+    );
     return {
       applied: false,
       reason: 'ai_tag_outside_whitelist',
       message: `AI 提议的 type "${wl.finalTag}" 不在 SCOPE 列表`,
+      error: 'ai_tag_outside_whitelist',
       suggestion: { tag: ai.tag, keywords: ai.keywords, reason: ai.reason },
     };
   }

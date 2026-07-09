@@ -94,7 +94,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
   }
 
   async function runLearnFromMiss() {
-    if (!item || learnLoading || learnQualLoading) return;
+    if (!item || learnLoading || learnQualLoading || learnNoticeTypeLoading) return;
     setLearnLoading(true);
     setLearnResult(null);
     try {
@@ -229,7 +229,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                 )}
                 {aiResult?.error && <span className="ml-3 text-danger">{aiResult.error}</span>}
               </div>
-              <Button size="sm" variant="ghost" disabled={aiLoading} onClick={runAiMatch}>
+              <Button size="sm" variant="ghost" disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading} onClick={runAiMatch}>
                 {aiLoading ? '计算中…' : '触发复核'}
               </Button>
             </div>
@@ -255,7 +255,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
               <Button
                 size="sm"
                 variant="outline"
-                disabled={learnLoading}
+                disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
                 onClick={runLearnFromMiss}
                 title="让 AI 判断此公告应归哪个 tag、并沉淀让算法自动覆盖此类的关键词"
               >
@@ -286,7 +286,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
               <Button
                 size="sm"
                 variant="outline"
-                disabled={learnQualLoading}
+                disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
                 onClick={runLearnQualFromMiss}
                 title="让 AI 从公告 requirement 中提炼资质类别、沉淀 qual_rules"
               >
@@ -316,7 +316,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
               <Button
                 size="sm"
                 variant="outline"
-                disabled={learnNoticeTypeLoading}
+                disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
                 onClick={runLearnNoticeTypeFromMiss}
                 title="让 AI 判断本公告类型（如招标公告/资格预审公告/竞争性磋商公告）、沉淀 notice_type_rules"
               >

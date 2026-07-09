@@ -109,25 +109,23 @@ function reconcileWithWhitelist(aiTag, { whitelist, existingTags }) {
  * 修 loop 1 audit F6 / loop 3 audit F6 —— 尊重 ai.matchExisting 字段
  * 当 AI 自报 matchExisting=true 且现有规则能命中 → 视为已覆盖，不重复写
  *
- * @param {{ai, text, existingRules, forTag, compiledRules?}} opts
- *   compiledRules: 已 compile 的 [{priority, tag, regex}]；不传时内联 compile（每次 O(N)）
+ * 性能：内部以 existingRules → 内联 compile（每次 O(N) 创建 regex）；对几百条规则够用
+ * 未来规则库膨胀再考虑 memo
+ *
  * @returns {{covered: boolean, hitRule?: object}}
  */
-function checkAlreadyCovered({ ai, text, existingRules, forTag, compiledRules = null }) {
+function checkAlreadyCovered({ ai, text, existingRules, forTag }) {
   if (!ai || ai.matchExisting !== true) return { covered: false };
-  const compiled = compiledRules || existingRules.map((r) => ({
-    _row: r,
-    regex: compileKeywords(r.keywords),
-  }));
-  const hit = compiled.find((c) => {
-    if (forTag && c._row.tag !== forTag) return false;
+  const hit = existingRules.find((r) => {
+    if (forTag && r.tag !== forTag) return false;
     try {
-      return c.regex.test(text);
+      const re = compileKeywords(r.keywords);
+      return re.test(text);
     } catch {
       return false;
     }
   });
-  return hit ? { covered: true, hitRule: hit._row } : { covered: false };
+  return hit ? { covered: true, hitRule: hit } : { covered: false };
 }
 
 // ---------------- LLM 调用 ----------------

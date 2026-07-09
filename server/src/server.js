@@ -23,6 +23,8 @@ const errLogsRouter = require('./routes/error-logs');
 const triggerRouter = require('./routes/scrape-trigger');
 const authRouter = require('./routes/auth');
 const settingsRouter = require('./routes/settings');
+const { NOTICE_TYPE_SCOPE } = require('./constants/aiEnums');
+
 const matching = require('./services/matching');
 const storage = require('./storage/adapter');
 
@@ -40,7 +42,7 @@ app.get('/api/enums', (req, res) => {
     business_match: ['主营业务可做', '部分可做', '不可做', '待评估'],
     review_status: ['A.未关注', 'A.关注中', 'H.已投标', 'X.已放弃', 'Y.未中标', 'Z.已中标'],
     project_progress: ['公告中', '报名截止', '开标中', '评标中', '中标公示', '已中标', '已流标', '已终止', '已结束'],
-    notice_type: ['采购公告', '招标公告', '资格预审公告', '竞争性磋商公告', '公开招标', '公开公告', '竞争性磋商', '其他'],
+    notice_type: [...NOTICE_TYPE_SCOPE],
     scrape_status: ['已抓取', '已审核', '已更新'],
     platform_status: ['已配置运行中', '有错误', '访问受限故停用', '已配置但停用'],
     in_scope_tags: [...matching.IN_SCOPE],

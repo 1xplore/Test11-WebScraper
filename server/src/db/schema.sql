@@ -153,6 +153,17 @@ CREATE TABLE IF NOT EXISTS scope_error_logs (
   created_at          TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+-- ---------- 公告类型错误日志（Loop 8：与 scope / qual 平行，AI 失败原因记录） ----------
+CREATE TABLE IF NOT EXISTS notice_type_error_logs (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  announcement_id     INTEGER REFERENCES announcements(id) ON DELETE CASCADE,
+  raw_text            TEXT NOT NULL,
+  resolved            INTEGER NOT NULL DEFAULT 0,
+  resolved_rule_id    INTEGER REFERENCES notice_type_rules(id),
+  resolved_tag        TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 -- ---------- 资质错误日志（替代 Notion QUAL_ERROR_LOG_DB） ----------
 CREATE TABLE IF NOT EXISTS qual_error_logs (
   id                  INTEGER PRIMARY KEY AUTOINCREMENT,
