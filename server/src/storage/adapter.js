@@ -394,111 +394,86 @@ function writeFeedbackLogs(items, results) {
 }
 
 // ---------- Scope 规则 ----------
+// Loop 14 抽通用层 _ruleOpsFactory —— 三套（scope/qual/notice_type）共用
+// 注意：保留同名导出 listXxxRules / patchXxxRule / createXxxRule 不破坏 matching.js / scopeAi / qualAi / noticeTypeAi / routes/* 的调用点
 
-function listScopeRules({ enabledOnly = false } = {}) {
-  const sql = enabledOnly
-    ? 'SELECT * FROM scope_rules WHERE enabled = 1 ORDER BY priority ASC'
-    : 'SELECT * FROM scope_rules ORDER BY priority ASC';
-  return db.prepare(sql).all();
-}
+function _ruleOpsFactory(tableName, { allowedCols, hasStopOnMatch = false, boolCols = ['enabled'] } = {}) {
+  const insertCols = allowedCols.filter((c) => c !== 'id');  // id 是自增
+  let invalidator = () => {};
+  function registerCacheInvalidator(fn) {
+    if (typeof fn === 'function') invalidator = fn;
+  }
+  function invalidateCache() {
+    try { invalidator(); } catch (_) { /* bootstrap 静默 */ }
+  }
 
-function patchScopeRule(id, patch) {
-  const allowed = ['priority', 'tag', 'keywords', 'stop_on_match', 'enabled'];
-  const fields = Object.entries(patch).filter(([k]) => allowed.includes(k));
-  if (fields.length === 0) return null;
-  const sql = `UPDATE scope_rules SET ${fields.map(([k]) => `${k} = ?`).join(', ')}, updated_at = datetime('now') WHERE id = ?`;
-  db.prepare(sql).run(...fields.map(([, v]) => v), id);
-  invalidateScopeRulesCache();  // 立刻让下次 inferScope 看到
-  return db.prepare('SELECT * FROM scope_rules WHERE id = ?').get(id);
-}
+  function list({ enabledOnly = false } = {}) {
+    const sql = enabledOnly
+      ? `SELECT * FROM ${tableName} WHERE enabled = 1 ORDER BY priority ASC`
+      : `SELECT * FROM ${tableName} ORDER BY priority ASC`;
+    return db.prepare(sql).all();
+  }
 
-function createScopeRule({ priority, tag, keywords, stop_on_match = 0, enabled = 1, source = 'manual' }) {
-  const info = db.prepare(
-    'INSERT INTO scope_rules (priority, tag, keywords, stop_on_match, enabled, source) VALUES (?, ?, ?, ?, ?, ?)'
-  ).run(priority, tag, keywords, stop_on_match ? 1 : 0, enabled ? 1 : 0, source);
-  invalidateScopeRulesCache();  // 立刻让下次 inferScope 看到
-  return db.prepare('SELECT * FROM scope_rules WHERE id = ?').get(info.lastInsertRowid);
-}
+  function patch(id, patch) {
+    const fields = Object.entries(patch).filter(([k]) => allowedCols.includes(k));
+    if (fields.length === 0) return null;
+    const setClauses = fields.map(([k]) => `${k} = ?`).join(', ');
+    const sql = `UPDATE ${tableName} SET ${setClauses}, updated_at = datetime('now') WHERE id = ?`;
+    db.prepare(sql).run(...fields.map(([, v]) => toBoolInt(v, boolCols, fields)), id);
+    invalidateCache();
+    return db.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).get(id);
+  }
 
-// 拉在适配层做：所有 scope_rules 写路径都强制失效缓存。
-// matching.js 提供 invalidator；adapter 不在顶部 require 避免循环依赖。
-let _scopeRulesCacheInvalidator = () => {};
-function registerScopeRulesCacheInvalidator(fn) {
-  if (typeof fn === 'function') _scopeRulesCacheInvalidator = fn;
-}
-function invalidateScopeRulesCache() {
-  try { _scopeRulesCacheInvalidator(); } catch (_) { /* bootstrap 阶段匹配未注册，静默 */ }
-}
+  function create(fields) {
+    const colsToInsert = insertCols.filter((c) => c in fields);
+    const placeholders = colsToInsert.map(() => '?').join(', ');
+    const sql = `INSERT INTO ${tableName} (${colsToInsert.join(', ')}) VALUES (${placeholders})`;
+    const info = db.prepare(sql).run(...colsToInsert.map((c) => toBoolInt(fields[c], boolCols, colsToInsert.map((x) => [c, fields[c]]))));
+    invalidateCache();
+    return db.prepare(`SELECT * FROM ${tableName} WHERE id = ?`).get(info.lastInsertRowid);
+  }
 
-// ---------- 资质规则（qual_rules）—— 同 scope_rules 形态 + ai-learned 通道 ----------
-
-function listQualRules({ enabledOnly = false } = {}) {
-  const sql = enabledOnly
-    ? 'SELECT * FROM qual_rules WHERE enabled = 1 ORDER BY priority ASC'
-    : 'SELECT * FROM qual_rules ORDER BY priority ASC';
-  return db.prepare(sql).all();
+  return { list, patch, create, registerCacheInvalidator, invalidateCache };
 }
 
-function patchQualRule(id, patch) {
-  const allowed = ['priority', 'tag', 'keywords', 'enabled'];
-  const fields = Object.entries(patch).filter(([k]) => allowed.includes(k));
-  if (fields.length === 0) return null;
-  const sql = `UPDATE qual_rules SET ${fields.map(([k]) => `${k} = ?`).join(', ')}, updated_at = datetime('now') WHERE id = ?`;
-  db.prepare(sql).run(...fields.map(([, v]) => v), id);
-  invalidateQualRulesCache();
-  return db.prepare('SELECT * FROM qual_rules WHERE id = ?').get(id);
+// bool 列（stop_on_match / enabled）存 INTEGER 0/1；外部传 true/false 自动归一
+function toBoolInt(value, boolCols, _debugColumnsIgnored) {
+  if (typeof value !== 'boolean') return value;
+  if (!boolCols) return value;
+  // 调用方负责传 boolCols；这里默认所有 boolean 都转 0/1
+  return value ? 1 : 0;
 }
 
-function createQualRule({ priority, tag, keywords, enabled = 1, source = 'manual' }) {
-  const info = db.prepare(
-    'INSERT INTO qual_rules (priority, tag, keywords, enabled, source) VALUES (?, ?, ?, ?, ?)'
-  ).run(priority, tag, keywords, enabled ? 1 : 0, source);
-  invalidateQualRulesCache();
-  return db.prepare('SELECT * FROM qual_rules WHERE id = ?').get(info.lastInsertRowid);
-}
+const scopeRulesOps = _ruleOpsFactory('scope_rules', {
+  allowedCols: ['priority', 'tag', 'keywords', 'stop_on_match', 'enabled', 'source'],
+  hasStopOnMatch: true,
+  boolCols: ['stop_on_match', 'enabled'],
+});
+const listScopeRules = scopeRulesOps.list;
+const patchScopeRule = scopeRulesOps.patch;
+const createScopeRule = scopeRulesOps.create;
+const registerScopeRulesCacheInvalidator = scopeRulesOps.registerCacheInvalidator;
+const invalidateScopeRulesCache = scopeRulesOps.invalidateCache;
 
-let _qualRulesCacheInvalidator = () => {};
-function registerQualRulesCacheInvalidator(fn) {
-  if (typeof fn === 'function') _qualRulesCacheInvalidator = fn;
-}
-function invalidateQualRulesCache() {
-  try { _qualRulesCacheInvalidator(); } catch (_) { /* 同上 */ }
-}
+const qualRulesOps = _ruleOpsFactory('qual_rules', {
+  allowedCols: ['priority', 'tag', 'keywords', 'enabled', 'source'],
+  boolCols: ['enabled'],
+});
+const listQualRules = qualRulesOps.list;
+const patchQualRule = qualRulesOps.patch;
+const createQualRule = qualRulesOps.create;
+const registerQualRulesCacheInvalidator = qualRulesOps.registerCacheInvalidator;
+const invalidateQualRulesCache = qualRulesOps.invalidateCache;
 
-// ---------- 公告类型（notice_type_rules）—— 第三套 self-growth (Loop 6) ----------
-
-function listNoticeTypeRules({ enabledOnly = false } = {}) {
-  const sql = enabledOnly
-    ? 'SELECT * FROM notice_type_rules WHERE enabled = 1 ORDER BY priority ASC'
-    : 'SELECT * FROM notice_type_rules ORDER BY priority ASC';
-  return db.prepare(sql).all();
-}
-
-function patchNoticeTypeRule(id, patch) {
-  const allowed = ['priority', 'tag', 'keywords', 'enabled'];
-  const fields = Object.entries(patch).filter(([k]) => allowed.includes(k));
-  if (fields.length === 0) return null;
-  const sql = `UPDATE notice_type_rules SET ${fields.map(([k]) => `${k} = ?`).join(', ')}, updated_at = datetime('now') WHERE id = ?`;
-  db.prepare(sql).run(...fields.map(([, v]) => v), id);
-  invalidateNoticeTypeRulesCache();
-  return db.prepare('SELECT * FROM notice_type_rules WHERE id = ?').get(id);
-}
-
-function createNoticeTypeRule({ priority, tag, keywords, enabled = 1, source = 'manual' }) {
-  const info = db.prepare(
-    'INSERT INTO notice_type_rules (priority, tag, keywords, enabled, source) VALUES (?, ?, ?, ?, ?)'
-  ).run(priority, tag, keywords, enabled ? 1 : 0, source);
-  invalidateNoticeTypeRulesCache();
-  return db.prepare('SELECT * FROM notice_type_rules WHERE id = ?').get(info.lastInsertRowid);
-}
-
-let _noticeTypeRulesCacheInvalidator = () => {};
-function registerNoticeTypeRulesCacheInvalidator(fn) {
-  if (typeof fn === 'function') _noticeTypeRulesCacheInvalidator = fn;
-}
-function invalidateNoticeTypeRulesCache() {
-  try { _noticeTypeRulesCacheInvalidator(); } catch (_) { /* 同上 */ }
-}
+const noticeTypeRulesOps = _ruleOpsFactory('notice_type_rules', {
+  allowedCols: ['priority', 'tag', 'keywords', 'enabled', 'source'],
+  boolCols: ['enabled'],
+});
+const listNoticeTypeRules = noticeTypeRulesOps.list;
+const patchNoticeTypeRule = noticeTypeRulesOps.patch;
+const createNoticeTypeRule = noticeTypeRulesOps.create;
+const registerNoticeTypeRulesCacheInvalidator = noticeTypeRulesOps.registerCacheInvalidator;
+const invalidateNoticeTypeRulesCache = noticeTypeRulesOps.invalidateCache;
 
 // ---------- 抓取运行日志 ----------
 
