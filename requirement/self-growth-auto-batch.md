@@ -83,11 +83,12 @@ CLI 输出形如：
 
 ## 4. 验收
 
-- [x] scripts/auto-batch.js CLI 直跑通（processed=10, applied=0, no_ai_key）
+- [x] scripts/auto-batch.js CLI 直跑通（默认 limit=5，本次按 --limit=10 跑）
 - [x] 接到 scripts/scheduled.js main.js 之后
 - [x] 与 services/autoBatch.runAutoBatch 同源
-- [x] 端到端 cron 模拟：python spawnSync worker 出 summary
+- [x] smoke `node scripts/auto-batch.js --types=scope,qual` 成功（loop 13 修 argv off-by-one 后）
 - [x] 失败模式返回合理 counts，不阻塞 main.js
+- [ ] 接到生产 crontab（CLAUDE.md 当前只列 5:00 scrape，加 5:30 worker）— Loop 14+
 
 ## 5. 后续
 

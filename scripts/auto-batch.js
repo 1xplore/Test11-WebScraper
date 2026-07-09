@@ -23,8 +23,9 @@ const autoBatch = require(path.join(PROJECT_DIR, 'server/src/services/autoBatch'
 function parseArgs(argv) {
   const opts = {};
   for (const a of argv.slice(2)) {
+    // 注意 '--limit=' '--types=' 都是 8 字符（`--xxx=` 含两个 dash + xxx=）
     if (a.startsWith('--limit=')) opts.limit = parseInt(a.slice(8), 10);
-    else if (a.startsWith('--types=')) opts.types = a.slice(7).split(',').map((s) => s.trim());
+    else if (a.startsWith('--types=')) opts.types = a.slice(8).split(',').map((s) => s.trim());
     else if (a === '--resolve') opts.resolveOnApply = true;
   }
   return opts;
