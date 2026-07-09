@@ -278,6 +278,73 @@ function patchAnnouncementNoticeType(id, noticeTypeTags) {
   return getAnnouncement(id);
 }
 
+/**
+ * Loop 18：backfill 旧 announcement 的 qual_tags + notice_type_tags
+ * 调 matching.inferQual / inferNoticeType 推断后写入
+ * 幂等：已有非空标签的行跳过（避免覆盖 loop 3+4 AI 沉淀的版本）
+ *
+ * @returns {updated, skipped, failed} 计数
+ */
+function backfillAnnouncementTags({ batchSize = 200, dryRun = false } = {}) {
+  const matching = require('../services/matching');
+  const ruleLearner = require('../services/ruleLearner');
+  const qualRules = listQualRules({ enabledOnly: true });
+  const noticeRules = listNoticeTypeRules({ enabledOnly: true });
+  const qualDyn = ruleLearner.buildDynamicRules(qualRules);
+  const noticeDyn = ruleLearner.buildDynamicRules(noticeRules);
+
+  let updated = 0, skipped = 0, failed = 0;
+  const total = db.prepare('SELECT COUNT(*) AS n FROM announcements').get().n;
+  let offset = 0;
+  while (offset < total) {
+    const rows = db.prepare(
+      `SELECT id, title, description, requirement, raw_text, qual_tags, notice_type_tags
+       FROM announcements ORDER BY id LIMIT ? OFFSET ?`
+    ).all(batchSize, offset);
+
+    for (const a of rows) {
+      // 任意一边已填就跳过（avoid 覆盖 AI 学出的人工修过内容）
+      const qualEmpty = !a.qual_tags || a.qual_tags === '[]' || a.qual_tags === '';
+      const noticeEmpty = !a.notice_type_tags || a.notice_type_tags === '[]' || a.notice_type_tags === '';
+      if (!qualEmpty || !noticeEmpty) { skipped++; continue; }
+
+      let updates, params;
+      try {
+        const qualText = (a.requirement || '').trim() || (a.raw_text || '').slice(0, 800);
+        const noticeText = `${a.title || ''}\n${a.description || a.raw_text || ''}`.slice(0, 1000);
+
+        updates = [];
+        params = [];
+        if (qualEmpty && qualText) {
+          const qualTags = matching.inferQual(qualText, qualDyn);
+          if (qualTags.length && !(qualTags.length === 1 && qualTags[0] === '未匹配')) {
+            updates.push('qual_tags = ?');
+            params.push(toJsonArray(qualTags));
+          }
+        }
+        if (noticeEmpty && noticeText.trim()) {
+          const noticeTags = matching.inferNoticeType(noticeText, noticeDyn);
+          if (noticeTags.length) {
+            updates.push('notice_type_tags = ?');
+            params.push(toJsonArray(noticeTags));
+          }
+        }
+        if (updates.length === 0) { skipped++; continue; }
+      } catch (e) {
+        failed++;
+        continue;
+      }
+      if (dryRun) { updated++; continue; }
+      updates.push('updated_at = datetime(\'now\')');
+      params.push(a.id);
+      db.prepare(`UPDATE announcements SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+      updated++;
+    }
+    offset += batchSize;
+  }
+  return { total, updated, skipped, failed };
+}
+
 // ---------- 反馈日志 ----------
 
 function writeScopeErrorLog(announcementId, rawText) {
@@ -648,6 +715,8 @@ module.exports = {
   registerNoticeTypeRulesCacheInvalidator, invalidateNoticeTypeRulesCache,
   // announcement tag patches
   patchAnnouncementQual, patchAnnouncementNoticeType,
+  // backfill (loop 18)
+  backfillAnnouncementTags,
   // feedback logs
   writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeFeedbackLogs,
   listScopeErrorLogs, listQualErrorLogs, listNoticeTypeErrorLogs,

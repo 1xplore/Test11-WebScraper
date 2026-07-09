@@ -64,6 +64,7 @@
 - [x] notice_type 第三套自迭代 (loop6 commit, 2026-07-10)
 - [x] 后台 worker 自动批跑 (loop12 commit, 2026-07-10)
 - [x] qual / notice_type seed 数据 (2b4711f, 2026-07-10)
+- [x] 957 历史公告 backfill tags (loop18 pending, 2026-07-10)
 - [ ] dashboard 看 AI 沉淀规则命中率
 
 ## §6. 部署 / 运维（deployment）
