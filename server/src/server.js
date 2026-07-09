@@ -38,6 +38,13 @@ app.get('/api/health', (req, res) => {
 });
 
 app.get('/api/enums', (req, res) => {
+  // Loop 19: 暴露 seed 统计，让前端能看到"哪些 tag 是系统自带 vs AI 学过的"
+  // —— seed 命中率高 → "AI 学一下" 按钮不值得老按
+  const seedCounts = {
+    scope: storage.listScopeRules().filter((r) => r.source === 'seed').length,
+    qual: storage.listQualRules().filter((r) => r.source === 'seed').length,
+    notice_type: storage.listNoticeTypeRules().filter((r) => r.source === 'seed').length,
+  };
   res.json({
     business_match: ['主营业务可做', '部分可做', '不可做', '待评估'],
     review_status: ['A.未关注', 'A.关注中', 'H.已投标', 'X.已放弃', 'Y.未中标', 'Z.已中标'],
@@ -48,6 +55,14 @@ app.get('/api/enums', (req, res) => {
     in_scope_tags: [...matching.IN_SCOPE],
     out_scope_tags: [...matching.OUT_OF_SCOPE],
     wuhan_districts: matching.WUHAN_DISTRICTS,
+    seed_counts: seedCounts,
+    // Loop 19 顺手把 {qual, notice_type}_tags 命中 tags 也列出来便于 UI
+    qual_tags_with_seed: storage.listQualRules({ enabledOnly: true })
+      .filter((r) => r.source === 'seed')
+      .map((r) => r.tag),
+    notice_type_tags_with_seed: storage.listNoticeTypeRules({ enabledOnly: true })
+      .filter((r) => r.source === 'seed')
+      .map((r) => r.tag),
   });
 });
 
