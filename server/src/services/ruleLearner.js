@@ -43,7 +43,7 @@ function tagNormalize(s) {
  */
 function compileKeywords(kwStr) {
   const raw = String(kwStr).trim();
-  if (!raw) return /(?!.)/;  // 永不匹配
+  if (!raw) return new RegExp('.^');  // 永不匹配（loop 25 fix：'(?!.)' 测出匹配非空串）
   // 按 | 切分顶级 OR 段；每段按 & 切分 AND term
   const orSegments = raw.split('|').map((s) => s.trim()).filter(Boolean);
   const compiledSegments = orSegments.map((segment) => {
@@ -61,7 +61,7 @@ function compileKeywords(kwStr) {
     });
     return new RegExp(lookaheads.join(''));
   }).filter(Boolean);
-  if (compiledSegments.length === 0) return /(?!.)/;
+  if (compiledSegments.length === 0) return new RegExp('.^');
   // 顶级 OR 段用 | 串联
   return new RegExp(compiledSegments.map((re) => re.source).join('|'));
 }
