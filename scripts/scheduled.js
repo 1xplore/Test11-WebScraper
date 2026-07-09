@@ -54,6 +54,28 @@ if (result.signal === 'SIGTERM') {
   log(`✗ 部分或全部失败（exit=${result.status}）`);
 }
 
+// Loop 12：scrape 完跑一遍自迭代 worker，让系统自己从 *_error_logs 学
+// 单跑 5 分钟 timeout；limit=10 每类最多 10 条；AI 没配则只扫不学（无副作用）
+log('========= 自迭代 worker 开始 =========');
+const workerStart = Date.now();
+const workerResult = spawnSync('node', ['scripts/auto-batch.js', '--limit=10'], {
+  cwd: PROJECT_DIR,
+  encoding: 'utf-8',
+  timeout: 5 * 60 * 1000,
+  env: process.env,
+});
+const workerElapsed = ((Date.now() - workerStart) / 1000).toFixed(1);
+if (workerResult.stdout) log('--- auto-batch stdout ---\n' + workerResult.stdout);
+if (workerResult.stderr) log('--- auto-batch stderr ---\n' + workerResult.stderr);
+log(`--- auto-batch exit=${workerResult.status}, signal=${workerResult.signal}, 耗时 ${workerElapsed}s ---`);
+if (workerResult.signal === 'SIGTERM') {
+  log('✗ worker 超时（>300s）被强结');
+} else if (workerResult.status === 0) {
+  log('✓ worker 完成');
+} else {
+  log(`✗ worker 部分失败（exit=${workerResult.status}）—— 不影响抓取已完成的入库`);
+}
+
 // 追加到日志文件
 fs.appendFileSync(logFile, lines.join('\n') + '\n');
 
