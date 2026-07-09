@@ -32,6 +32,7 @@ const {
   parseQualificationText,
   extractQualSection
 } = require('../utils/parseHtmlContent');
+const { computeLocalScore } = require('../server/src/services/matching');
 const {
   NOTION_TOKEN,
   SCOPE_ERROR_LOG_DB,
@@ -305,6 +306,7 @@ function createPlatform({
     item.scopeTags = inferScopeFn(record, htmlParsed.demandKeywords || '', scopeRules);
     item.businessMatch = inferBusinessMatch(item.scopeTags);
     item.projectProgress = inferProgress(item);
+    item.matchScore = computeLocalScore(item.scopeTags, item.title);
     return item;
   }
 

@@ -414,6 +414,13 @@ function getStats() {
      FROM platforms p LEFT JOIN announcements a ON a.source_platform_id = p.id
      GROUP BY p.id ORDER BY n DESC`
   ).all();
+  const byDistrict = db.prepare(
+    `SELECT json_each.value AS k, COUNT(*) AS n
+     FROM announcements, json_each(district)
+     WHERE json_each.value IS NOT NULL AND json_each.value != ''
+     GROUP BY json_each.value
+     ORDER BY n DESC`
+  ).all();
   const recent7d = db.prepare(
     "SELECT COUNT(*) AS n FROM announcements WHERE notice_start_date >= date('now', '-7 days')"
   ).get().n;
@@ -427,6 +434,7 @@ function getStats() {
     by_review_status: byReview,
     by_progress: byProgress,
     by_platform: byPlatform,
+    by_district: byDistrict,
   };
 }
 

@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import StatStrip from '@/components/StatStrip.jsx';
+import AggregationStrip from '@/components/AggregationStrip.jsx';
 import FilterBar from '@/components/FilterBar.jsx';
 import AnnouncementCard from '@/components/AnnouncementCard.jsx';
 import AnnouncementDetail from '@/components/AnnouncementDetail.jsx';
@@ -69,6 +70,12 @@ export default function Dashboard() {
   return (
     <>
       <StatStrip stats={stats} />
+      <AggregationStrip
+        stats={stats}
+        platforms={platforms}
+        onSelectDistrict={(name) => applyFilters({ district: name })}
+        onSelectPlatform={(id) => applyFilters({ platformId: id })}
+      />
       <FilterBar filters={filters} onChange={applyFilters} platforms={platforms} />
 
       <div className="filter-bar" style={{ paddingTop: 0, paddingBottom: 8 }}>
