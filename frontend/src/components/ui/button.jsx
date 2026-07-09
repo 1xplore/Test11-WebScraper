@@ -4,17 +4,17 @@ import { cva } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0075de]/40 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        default: 'bg-[#0075de] text-white hover:bg-[#0066c4]',
-        secondary: 'bg-[#f6f5f4] text-slate-900 border border-[#e6e6e6] hover:bg-[#eeeceb]',
-        ghost: 'hover:bg-[#f6f5f4] text-slate-700',
-        outline: 'border border-[#e6e6e6] bg-white hover:bg-[#f6f5f4] text-slate-900',
-        danger: 'bg-[#dc2626] text-white hover:bg-[#b91c1c]',
-        success: 'bg-[#059669] text-white hover:bg-[#047857]',
-        warning: 'bg-[#d97706] text-white hover:bg-[#b45309]',
+        default: 'bg-accent text-accent-fg hover:bg-accent-hover',
+        secondary: 'bg-surface-sunken text-ink border border-rule hover:bg-canvas',
+        ghost: 'hover:bg-surface-sunken text-ink',
+        outline: 'border border-rule bg-surface text-ink hover:bg-surface-sunken',
+        danger: 'bg-danger text-white hover:opacity-90',
+        success: 'bg-success text-white hover:opacity-90',
+        warning: 'bg-warning text-white hover:opacity-90',
       },
       size: {
         sm: 'h-8 px-3 text-xs',

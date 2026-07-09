@@ -19,7 +19,7 @@ export default function AppShell() {
         <div className="page-header-inner">
           <div className="brand">
             <div className="brand-mark">招</div>
-            <span>招标线索看板</span>
+            <span className="brand-text">招标线索看板</span>
             <span className="brand-sub">v0.1 · 本地模式</span>
           </div>
           <nav className="flex items-center gap-1">
@@ -30,8 +30,10 @@ export default function AppShell() {
                 end={item.end}
                 className={({ isActive }) =>
                   cn(
-                    'flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium transition-colors',
-                    isActive ? 'bg-[#dbeafe] text-[#0075de]' : 'text-slate-600 hover:bg-[#f6f5f4]'
+                    'inline-flex items-center gap-1.5 px-3.5 py-2 rounded-md text-sm font-medium transition-colors leading-none',
+                    isActive
+                      ? 'bg-accent-soft text-accent'
+                      : 'text-ink-muted hover:bg-surface-sunken hover:text-ink'
                   )
                 }
               >
@@ -40,7 +42,7 @@ export default function AppShell() {
               </NavLink>
             ))}
           </nav>
-          <div className="border-l border-[#e6e6e6] pl-4 ml-1">
+          <div className="border-l border-rule pl-4 ml-1">
             <Login />
           </div>
         </div>

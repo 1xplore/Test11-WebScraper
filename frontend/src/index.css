@@ -7,31 +7,73 @@
    风格：克制商务 + Notion 语义 + 微质感
    ============================================ */
 
+/* ============================================
+   Tailwind v4 Theme Tokens（自动生成 bg-/text-/border-* utility）
+   命名规则：canvas（主背景）/ surface（卡片）/ surface-sunken（次级）
+            ink（主文字）/ rule（边框）/ accent + 4 个语义色
+   ============================================ */
+@theme {
+  --color-canvas: #f7f8fa;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f6f5f4;
+
+  --color-ink: #0f172a;
+  --color-ink-muted: #5f6b7a;
+  --color-ink-subtle: #9aa3af;
+
+  --color-accent: #0075de;
+  --color-accent-hover: #0066c4;
+  --color-accent-2: #213183;
+  --color-accent-soft: #dbeafe;
+  --color-accent-fg: #ffffff;
+
+  --color-rule: #e6e6e6;
+  --color-rule-strong: #d0d5dd;
+
+  --color-success: #0d9268;
+  --color-success-soft: #d1fae5;
+  --color-success-fg: #065f46;
+  --color-warning: #b45309;
+  --color-warning-emphasis: #fcd34d;
+  --color-warning-soft: #fef3c7;
+  --color-warning-fg: #92400e;
+  --color-danger: #c63838;
+  --color-danger-soft: #fee2e2;
+  --color-danger-fg: #991b1b;
+  --color-info: #1e40af;
+  --color-info-soft: #dbeafe;
+}
+
 :root {
-  /* Surface tokens */
+  /* Surface tokens（保留供自定义 CSS class 使用） */
   --bg: #f7f8fa;
   --bg-elevated: #ffffff;
-  --bg-sunken: #f1f3f6;
+  --bg-sunken: #f6f5f4;
   --fg: #0f172a;
   --fg-muted: #5f6b7a;
   --fg-subtle: #9aa3af;
 
   /* Accent: 蓝紫 (#0075de → #213183) 是 Notion 风，避免紫色 AI-slop 渐变 */
-  --accent: #0d6efd;
+  --accent: #0075de;
   --accent-2: #213183;
-  --accent-soft: #e6f0ff;
+  --accent-soft: #dbeafe;
   --accent-fg: #ffffff;
 
   /* Semantic */
-  --border: #e6e8ee;
+  --border: #e6e6e6;
   --border-strong: #d0d5dd;
   --success: #0d9268;
-  --success-bg: #d4f0e1;
+  --success-bg: #d1fae5;
+  --success-fg: #065f46;
   --warning: #b45309;
-  --warning-bg: #fef0d3;
+  --warning-emphasis: #fcd34d;
+  --warning-bg: #fef3c7;
+  --warning-fg: #92400e;
   --danger: #c63838;
-  --danger-bg: #fce4e4;
-  --info-bg: #e0eaff;
+  --danger-bg: #fee2e2;
+  --danger-fg: #991b1b;
+  --info: #1e40af;
+  --info-bg: #dbeafe;
 
   /* Geometry */
   --radius-sm: 6px;
@@ -50,6 +92,14 @@
     "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-display: var(--font-sans);
   --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, Menlo, monospace;
+
+  /* ============================================
+     统一控件高度（chip / badge / nav / input / select / button）
+     这是 #1 #2 #3 修复的源头：之前各处高度不统一（24/28/32/34/36）
+     ============================================ */
+  --control-h-sm: 28px;
+  --control-h-md: 32px;
+  --control-h-lg: 36px;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -93,6 +143,7 @@ button { font-family: inherit; }
 .brand-mark {
   width: 30px; height: 30px;
   border-radius: 8px;
+  /* 唯一保留的渐变（brand anchor）；其他位置收敛到实色 */
   background:
     linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
   display: flex; align-items: center; justify-content: center;
@@ -107,7 +158,7 @@ button { font-family: inherit; }
 }
 .brand-sub {
   color: var(--fg-muted); font-weight: 400; font-size: 11px; margin-left: 6px;
-  padding: 2px 6px; background: var(--bg-sunken); border-radius: 4px;
+  padding: 3px 8px; background: var(--bg-sunken); border-radius: 4px;
 }
 
 /* ========== KPI Strip ========== */
@@ -132,7 +183,7 @@ button { font-family: inherit; }
 .kpi::after {
   content: "";
   position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
-  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  background: var(--accent);
   opacity: 0.85;
 }
 .kpi-label {
@@ -155,11 +206,11 @@ button { font-family: inherit; }
 }
 
 .search-box {
-  display: flex; align-items: center; gap: 6px;
+  display: flex; align-items: center; gap: 8px;
   background: var(--bg-elevated);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: 0 10px; height: 34px; width: 280px;
+  padding: 0 12px; height: var(--control-h-lg); width: 280px;
   transition: all 0.18s;
   box-shadow: var(--shadow-xs);
 }
@@ -170,6 +221,7 @@ button { font-family: inherit; }
 .search-box input {
   border: none; outline: none; background: transparent;
   font-size: 13px; flex: 1; color: var(--fg);
+  line-height: 1.4;
 }
 .search-box input::placeholder { color: var(--fg-subtle); }
 
@@ -240,11 +292,14 @@ button { font-family: inherit; }
   letter-spacing: -0.005em;
 }
 
-.bid-card-tags { display: flex; flex-wrap: wrap; gap: 4px; }
+.bid-card-tags { display: flex; flex-wrap: wrap; gap: 6px; }
 .bid-card-tag {
-  display: inline-block; padding: 2px 7px;
-  background: var(--bg-sunken); border-radius: 5px;
-  font-size: 11px; color: var(--fg-muted); font-weight: 500;
+  display: inline-flex; align-items: center;
+  padding: 4px 10px;
+  background: var(--bg-sunken); border-radius: 6px;
+  font-size: 12px; color: var(--fg-muted); font-weight: 500;
+  line-height: 1.4;
+  border: 1px solid var(--border);
 }
 
 .bid-card-meta {
@@ -282,7 +337,7 @@ button { font-family: inherit; }
 
 /* ========== AI banner ========== */
 .ai-banner {
-  background: linear-gradient(135deg, rgba(13, 110, 253, 0.05), rgba(33, 49, 131, 0.05));
+  background: var(--accent-soft);
   border: 1px solid rgba(13, 110, 253, 0.2);
   border-radius: var(--radius-md);
   padding: 12px 16px;
@@ -292,7 +347,7 @@ button { font-family: inherit; }
 .ai-banner-text { color: var(--fg); font-weight: 600; }
 .ai-banner-icon {
   width: 18px; height: 18px; border-radius: 4px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  background: var(--accent);
   color: white; display: inline-flex; align-items: center; justify-content: center;
 }
 
@@ -311,7 +366,7 @@ button { font-family: inherit; }
 }
 .detail-section-title::before {
   content: ""; width: 3px; height: 12px; border-radius: 2px;
-  background: linear-gradient(180deg, var(--accent), var(--accent-2));
+  background: var(--accent);
 }
 .detail-block {
   background: var(--bg-sunken);
@@ -326,13 +381,6 @@ button { font-family: inherit; }
 /* ========== 字体细节 ========== */
 .font-display { font-family: var(--font-display); font-feature-settings: "cv11"; }
 .tabular { font-variant-numeric: tabular-nums; }
-
-.text-muted { color: var(--fg-muted); }
-.text-subtle { color: var(--fg-subtle); }
-.text-accent { color: var(--accent); }
-.text-danger { color: var(--danger); }
-.text-success { color: var(--success); }
-.text-warning { color: var(--warning); }
 
 /* ========== Mobile niceties ========== */
 @media (max-width: 600px) {

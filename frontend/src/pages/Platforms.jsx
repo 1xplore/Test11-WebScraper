@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Power, AlertTriangle, RefreshCw, Play, Loader2 } from 'lucide-react';
+import { Power, AlertTriangle, RefreshCw, Play, Loader2, Boxes } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import PageHeader from '@/components/PageHeader.jsx';
 import { fetcher, fmt } from '@/lib/api';
 
 const STATUS_VARIANT = {
@@ -47,10 +49,6 @@ export default function Platforms() {
   useEffect(() => { loadTasks(); const t = setInterval(loadTasks, 2000); return () => clearInterval(t); }, [loadTasks]);
 
   function siteKeyFor(p) {
-    // script_id 转 site_key（去掉 _district 后缀 → 取首段作为 key）
-    // 例如 'wuhan_dongxihu_district' → 'dongxihu'?  但 main.js 里 site 是 dongxihu，不是 wuhan_dongxihu
-    // 我们的 scraper site key 列表（SITE_KEYS）跟 platforms.script_id 不一定一一对应
-    // 简单方案：人工映射（script_id → site_key）
     const map = {
       'wuhan_public': 'whzbtbxt',
       'wuhan_zhongcai': 'whzfcgxt',
@@ -116,74 +114,128 @@ export default function Platforms() {
     }
   }
 
-  return (
-    <div className="max-w-[1200px] mx-auto p-7">
-      <div className="flex items-center justify-between mb-5">
-        <div>
-          <h1 className="text-xl font-semibold">抓取来源管理</h1>
-          <p className="text-xs text-muted mt-1">切换平台运行状态。下次 cron（每天 5:00）会按"已配置运行中"过滤执行。</p>
-        </div>
-        <Button variant="outline" size="sm" onClick={load} disabled={loading}>
-          <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
-          刷新
-        </Button>
-      </div>
+  const enabledCount = list.filter((p) => p.status === '已配置运行中').length;
+  const errorCount = list.filter((p) => p.status === '有错误').length;
 
-      {loading ? (
-        <div className="text-center text-muted py-12">加载中…</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {list.map((p) => (
-            <div key={p.id} className="bg-white rounded-lg border border-[#e6e6e6] p-4 flex flex-col gap-3">
-              <div className="flex items-start justify-between gap-2">
-                <div>
-                  <div className="font-medium">{p.name}</div>
-                  <div className="text-xs text-muted font-mono mt-0.5">{p.script_id}</div>
-                </div>
-                <Badge variant={STATUS_VARIANT[p.status] || 'muted'}>{p.status}</Badge>
-              </div>
-              {p.homepage && (
-                <a href={p.homepage} target="_blank" rel="noopener noreferrer" className="text-xs text-accent hover:underline truncate">
-                  {p.homepage}
-                </a>
-              )}
-              <div className="text-xs text-muted flex gap-4 border-t border-[#e6e6e6] pt-3">
-                <span>运行 {p.total_runs} 次</span>
-                <span>最近 {p.last_run_at ? fmt.dateTime(p.last_run_at) : '—'}</span>
-              </div>
-              {p.last_error && (
-                <div className="text-xs text-danger bg-[#fef2f2] px-2 py-1 rounded truncate" title={p.last_error}>
-                  {p.last_error}
-                </div>
-              )}
-              <div className="flex gap-2 mt-auto flex-wrap">
-                <Button size="sm" variant={p.status === '已配置运行中' ? 'outline' : 'default'} onClick={() => toggle(p)} disabled={busy === p.id}>
-                  <Power className="h-3.5 w-3.5" />
-                  {p.status === '已配置运行中' ? '停用' : '启用'}
-                </Button>
-                <Button size="sm" variant="secondary" onClick={() => trigger(p, 1, 10)} disabled={busy === p.id || (triggering?.scriptId === p.script_id && triggering?.status === 'running')}>
-                  {triggering?.scriptId === p.script_id && triggering?.status === 'running' ? (
-                    <><Loader2 className="h-3.5 w-3.5 animate-spin" />运行中</>
-                  ) : (
-                    <><Play className="h-3.5 w-3.5" />立即抓取</>
-                  )}
-                </Button>
-                {p.status !== '有错误' && (
-                  <Button size="sm" variant="ghost" onClick={() => markError(p)} disabled={busy === p.id}>
-                    <AlertTriangle className="h-3.5 w-3.5" />
-                    标记有错
-                  </Button>
-                )}
-              </div>
-              {triggering?.scriptId === p.script_id && (
-                <div className={`text-xs mt-2 px-2 py-1 rounded ${triggering.status === 'error' ? 'bg-[#fce4e4] text-[#c63838]' : 'bg-[#e0eaff] text-[#1e40af]'}`}>
-                  {triggering.status === 'error' ? `✗ ${triggering.error}` : '✓ 已触发，2 秒后看 scrape-runs 页面'}
-                </div>
-              )}
-            </div>
-          ))}
+  return (
+    <div className="pb-12">
+      <PageHeader
+        title="抓取来源管理"
+        description="切换平台运行状态。下次 cron（每天 5:00）会按「已配置运行中」过滤执行。"
+        actions={
+          <Button variant="outline" size="sm" onClick={load} disabled={loading}>
+            <RefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin' : ''}`} />
+            刷新
+          </Button>
+        }
+      />
+
+      <div className="max-w-[1200px] mx-auto px-7">
+        {/* 概览条 */}
+        <div className="flex items-center gap-2 mb-5">
+          <Badge variant="success">
+            <Boxes className="h-3 w-3 mr-1" />
+            {enabledCount} 个运行中
+          </Badge>
+          {errorCount > 0 && (
+            <Badge variant="danger">
+              <AlertTriangle className="h-3 w-3 mr-1" />
+              {errorCount} 个异常
+            </Badge>
+          )}
+          <Badge variant="muted">{list.length} 个总计</Badge>
         </div>
-      )}
+
+        {loading ? (
+          <div className="text-center text-ink-muted py-16 text-sm">加载中…</div>
+        ) : list.length === 0 ? (
+          <Card className="p-16 text-center">
+            <Boxes className="h-10 w-10 mx-auto text-ink-subtle mb-3" />
+            <div className="text-ink-muted">暂无抓取来源</div>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {list.map((p) => (
+              <Card key={p.id} className="p-5 flex flex-col gap-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="font-medium text-ink truncate">{p.name}</div>
+                    <div className="text-[11px] text-ink-muted font-mono mt-0.5 truncate">{p.script_id}</div>
+                  </div>
+                  <Badge variant={STATUS_VARIANT[p.status] || 'muted'}>{p.status}</Badge>
+                </div>
+                {p.homepage && (
+                  <a
+                    href={p.homepage}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-accent hover:underline truncate"
+                  >
+                    {p.homepage}
+                  </a>
+                )}
+                <div className="text-xs text-ink-muted flex gap-4 border-t border-rule pt-3">
+                  <span>运行 <span className="text-ink font-medium tabular">{p.total_runs}</span> 次</span>
+                  <span>最近 {p.last_run_at ? fmt.dateTime(p.last_run_at) : '—'}</span>
+                </div>
+                {p.last_error && (
+                  <div
+                    className="text-xs text-danger-fg bg-danger-soft px-2.5 py-1.5 rounded-md truncate"
+                    title={p.last_error}
+                  >
+                    {p.last_error}
+                  </div>
+                )}
+                <div className="flex gap-2 mt-auto flex-wrap">
+                  <Button
+                    size="sm"
+                    variant={p.status === '已配置运行中' ? 'outline' : 'default'}
+                    onClick={() => toggle(p)}
+                    disabled={busy === p.id}
+                  >
+                    <Power className="h-3.5 w-3.5" />
+                    {p.status === '已配置运行中' ? '停用' : '启用'}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    onClick={() => trigger(p, 1, 10)}
+                    disabled={busy === p.id || (triggering?.scriptId === p.script_id && triggering?.status === 'running')}
+                  >
+                    {triggering?.scriptId === p.script_id && triggering?.status === 'running' ? (
+                      <><Loader2 className="h-3.5 w-3.5 animate-spin" />运行中</>
+                    ) : (
+                      <><Play className="h-3.5 w-3.5" />立即抓取</>
+                    )}
+                  </Button>
+                  {p.status !== '有错误' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => markError(p)}
+                      disabled={busy === p.id}
+                    >
+                      <AlertTriangle className="h-3.5 w-3.5" />
+                      标记有错
+                    </Button>
+                  )}
+                </div>
+                {triggering?.scriptId === p.script_id && (
+                  <div
+                    className={`text-xs mt-2 px-2.5 py-1.5 rounded-md ${
+                      triggering.status === 'error'
+                        ? 'bg-danger-soft text-danger-fg'
+                        : 'bg-accent-soft text-info'
+                    }`}
+                  >
+                    {triggering.status === 'error' ? `✗ ${triggering.error}` : '✓ 已触发，2 秒后看 scrape-runs 页面'}
+                  </div>
+                )}
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

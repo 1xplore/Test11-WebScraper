@@ -103,7 +103,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         {loading || !item ? (
-          <div className="py-10 text-center text-muted">加载中…</div>
+          <div className="py-10 text-center text-ink-muted">加载中…</div>
         ) : (
           <>
             <DialogHeader>
@@ -128,8 +128,8 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
             </DialogHeader>
 
             {/* 快速审核 */}
-            <div className="flex flex-wrap items-center gap-2 py-3 border-y border-[#e6e6e6]">
-              <span className="text-xs text-muted mr-1">快速审核:</span>
+            <div className="flex flex-wrap items-center gap-2 py-3 border-y border-rule">
+              <span className="text-xs text-ink-muted mr-1">快速审核:</span>
               {REVIEW_QUICK.map((q) => {
                 const active = item.review_status === q.value;
                 return (
@@ -139,7 +139,6 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                     variant={active ? 'default' : q.variant}
                     disabled={saving}
                     onClick={() => setReview(q.value)}
-                    className={active ? '' : ''}
                   >
                     <q.icon className="h-3.5 w-3.5" />
                     {q.label}
@@ -160,7 +159,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                 <Sparkles className="h-3.5 w-3.5 inline mr-1 text-accent" />
                 <span className="ai-banner-text">AI 业务复核</span>
                 {aiResult?.result && (
-                  <span className="ml-3 text-muted">
+                  <span className="ml-3 text-ink-muted">
                     新分 {fmt.score(aiResult.result.matchScore)}
                     {aiResult.result.aiReason ? ` · ${aiResult.result.aiReason}` : ''}
                   </span>
@@ -179,7 +178,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                 <dt>项目编号</dt><dd>{item.project_code || '—'}</dd>
                 <dt>公告 ID</dt><dd className="font-mono text-xs">{item.notice_id || '—'}</dd>
                 <dt>公告类型</dt><dd>{item.notice_type || '—'}</dd>
-                <dt>招标人</dt><dd>{item.tender_corp || '—'}{item.tender_link_man && <span className="text-muted"> · {item.tender_link_man}{item.tender_link_phone ? ` ${item.tender_link_phone}` : ''}</span>}</dd>
+                <dt>招标人</dt><dd>{item.tender_corp || '—'}{item.tender_link_man && <span className="text-ink-muted"> · {item.tender_link_man}{item.tender_link_phone ? ` ${item.tender_link_phone}` : ''}</span>}</dd>
                 <dt>代理机构</dt><dd>{item.agency_corp || '—'}</dd>
                 <dt>所属区域</dt><dd>{(item.district || []).join('、') || '—'}</dd>
                 <dt>联系地址</dt><dd>{item.address || '—'}</dd>
@@ -220,7 +219,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                   <Badge key={t} variant="outline">{t}</Badge>
                 ))}
                 {(!item.scope_tags || item.scope_tags.length === 0) && (
-                  <span className="text-muted text-sm">— 无 —</span>
+                  <span className="text-ink-muted text-sm">— 无 —</span>
                 )}
               </div>
 
@@ -230,7 +229,7 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                 onChange={(e) => setReviewNote(e.target.value)}
                 placeholder="记录跟进情况 / 关键联系人 / 弃标原因等..."
                 rows={3}
-                className="w-full px-3 py-2 text-sm rounded-md border border-[#e6e6e6] bg-white focus:outline-none focus:border-[#0075de] focus:ring-2 focus:ring-[#0075de]/15 resize-y"
+                className="w-full px-3 py-2 text-sm rounded-md border border-rule bg-surface text-ink placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 resize-y"
               />
             </div>
 

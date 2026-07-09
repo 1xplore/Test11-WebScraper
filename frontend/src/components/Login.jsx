@@ -10,7 +10,6 @@ export default function Login() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    // 检查 token 是否还有效
     if (user) {
       auth.me().catch(() => { auth.logout(); setUser(null); });
     }
@@ -39,7 +38,7 @@ export default function Login() {
   if (user) {
     return (
       <div className="flex items-center gap-2">
-        <div className="hidden md:flex items-center gap-1.5 px-3 h-8 rounded-md bg-[#dbeafe] text-[#1e40af] text-sm font-medium">
+        <div className="hidden md:inline-flex items-center gap-1.5 px-3 h-8 rounded-md bg-accent-soft text-info text-sm font-medium">
           <User className="h-3.5 w-3.5" />
           {user.display_name || user.username}
         </div>
@@ -51,7 +50,7 @@ export default function Login() {
   return (
     <form onSubmit={submit} className="flex items-center gap-2">
       <div className="search-box" style={{ width: '180px' }}>
-        <User className="h-3.5 w-3.5 text-slate-400" />
+        <User className="h-3.5 w-3.5 text-ink-subtle" />
         <input
           placeholder="输入用户名登录"
           value={username}
@@ -63,7 +62,7 @@ export default function Login() {
         <LogIn className="h-3.5 w-3.5" />
         {busy ? '登录中…' : '登录'}
       </Button>
-      {error && <span className="text-xs text-[#c63838]">{error}</span>}
+      {error && <span className="text-xs text-danger">{error}</span>}
     </form>
   );
 }

@@ -72,16 +72,16 @@ export default function Dashboard() {
       <FilterBar filters={filters} onChange={applyFilters} platforms={platforms} />
 
       <div className="filter-bar" style={{ paddingTop: 0, paddingBottom: 8 }}>
-        <div className="flex items-center gap-2 text-xs text-muted">
+        <div className="flex items-center gap-2 text-xs text-ink-muted">
           <span>{loading ? '加载中…' : `共 ${total} 条`}</span>
           {Object.values(filters).filter(Boolean).length > 0 && (
             <span>· 已应用 {Object.values(filters).filter(Boolean).length} 个筛选</span>
           )}
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <ArrowUpDown className="h-3.5 w-3.5 text-muted" />
+          <ArrowUpDown className="h-3.5 w-3.5 text-ink-muted" />
           <Select value={sortKey} onValueChange={setSortKey}>
-            <SelectTrigger className="w-[150px] h-8"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="w-[150px] h-9"><SelectValue /></SelectTrigger>
             <SelectContent>
               {SORT_OPTIONS.map((o) => (
                 <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -91,7 +91,7 @@ export default function Dashboard() {
           <a
             href={fetcher.exportCsvUrl(filters)}
             download
-            className="inline-flex items-center gap-1 h-8 px-3 text-xs font-medium rounded-md border border-[#e6e6e6] bg-white text-slate-700 hover:bg-[#f6f5f4]"
+            className="inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-md border border-rule bg-surface text-ink hover:bg-surface-sunken transition-colors"
           >
             <Download className="h-3.5 w-3.5" />
             导出 CSV
@@ -132,7 +132,7 @@ export default function Dashboard() {
           <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage((p) => p - 1)}>
             上一页
           </Button>
-          <span className="text-xs text-muted self-center">
+          <span className="text-xs text-ink-muted self-center">
             第 {page} 页 / 共 {Math.ceil(total / PAGE_SIZE)} 页
           </span>
           <Button variant="outline" size="sm" disabled={page * PAGE_SIZE >= total} onClick={() => setPage((p) => p + 1)}>

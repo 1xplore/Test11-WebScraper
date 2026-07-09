@@ -136,7 +136,7 @@ export default function AnnouncementCard({ item, onClick }) {
         <div className="bid-card-date">
           {fmt.date(item.notice_start_date)}
           {item.notice_end_date && (
-            <span className="ml-2 text-subtle">截止 {fmt.date(item.notice_end_date)}</span>
+            <span className="ml-2 text-ink-subtle">截止 {fmt.date(item.notice_end_date)}</span>
           )}
         </div>
         {item.detail_url && (

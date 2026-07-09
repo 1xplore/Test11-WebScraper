@@ -49,21 +49,21 @@ export default function FilterBar({ filters, onChange, platforms }) {
   return (
     <div className="filter-bar">
       <div className="search-box">
-        <Search className="h-3.5 w-3.5 text-slate-400" />
+        <Search className="h-3.5 w-3.5 text-ink-subtle" />
         <input
           placeholder="搜索标题 / 项目编号 / 招标人..."
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
         {q && (
-          <button onClick={() => setQ('')} className="text-slate-400 hover:text-slate-700">
+          <button onClick={() => setQ('')} className="text-ink-subtle hover:text-ink transition-colors">
             <X className="h-3.5 w-3.5" />
           </button>
         )}
       </div>
 
       <Select value={filters.businessMatch || 'all'} onValueChange={(v) => set('businessMatch', v)}>
-        <SelectTrigger className="w-[140px]"><SelectValue /></SelectTrigger>
+        <SelectTrigger className="w-[140px] h-9"><SelectValue /></SelectTrigger>
         <SelectContent>
           {BUSINESS_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -72,7 +72,7 @@ export default function FilterBar({ filters, onChange, platforms }) {
       </Select>
 
       <Select value={filters.reviewStatus || 'all'} onValueChange={(v) => set('reviewStatus', v)}>
-        <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+        <SelectTrigger className="w-[130px] h-9"><SelectValue /></SelectTrigger>
         <SelectContent>
           {REVIEW_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -81,7 +81,7 @@ export default function FilterBar({ filters, onChange, platforms }) {
       </Select>
 
       <Select value={filters.progress || 'all'} onValueChange={(v) => set('progress', v)}>
-        <SelectTrigger className="w-[120px]"><SelectValue /></SelectTrigger>
+        <SelectTrigger className="w-[120px] h-9"><SelectValue /></SelectTrigger>
         <SelectContent>
           {PROGRESS_OPTIONS.map((o) => (
             <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
@@ -90,7 +90,7 @@ export default function FilterBar({ filters, onChange, platforms }) {
       </Select>
 
       <Select value={filters.platformId || 'all'} onValueChange={(v) => onChange({ platformId: v === 'all' ? null : parseInt(v, 10) })}>
-        <SelectTrigger className="w-[180px]"><SelectValue placeholder="全部平台" /></SelectTrigger>
+        <SelectTrigger className="w-[180px] h-9"><SelectValue placeholder="全部平台" /></SelectTrigger>
         <SelectContent>
           {platformOptions.map((p) => (
             <SelectItem key={p.id || 'all'} value={p.id == null ? 'all' : String(p.id)}>{p.name}</SelectItem>
@@ -101,7 +101,7 @@ export default function FilterBar({ filters, onChange, platforms }) {
       {(filters.q || filters.businessMatch || filters.reviewStatus || filters.progress || filters.platformId) && (
         <button
           onClick={() => { setQ(''); onChange({ q: null, businessMatch: null, reviewStatus: null, progress: null, platformId: null }); }}
-          className="text-xs text-slate-500 hover:text-slate-900 ml-2"
+          className="inline-flex items-center h-9 px-3 text-xs font-medium rounded-md text-ink-muted hover:text-ink hover:bg-surface-sunken transition-colors ml-2"
         >
           清空筛选
         </button>

@@ -14,7 +14,7 @@ const DropdownMenuContent = React.forwardRef(({ className, sideOffset = 4, ...pr
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'z-50 min-w-[10rem] overflow-hidden rounded-md border border-[#e6e6e6] bg-white p-1 shadow-md',
+        'z-50 min-w-[10rem] overflow-hidden rounded-md border border-rule bg-surface p-1 shadow-md',
         className
       )}
       {...props}
@@ -28,7 +28,7 @@ const DropdownMenuItem = React.forwardRef(({ className, inset, ...props }, ref) 
     ref={ref}
     className={cn(
       'relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none',
-      'focus:bg-[#f6f5f4] data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
+      'focus:bg-surface-sunken data-[disabled]:pointer-events-none data-[disabled]:opacity-50',
       inset && 'pl-8',
       className
     )}
@@ -38,12 +38,12 @@ const DropdownMenuItem = React.forwardRef(({ className, inset, ...props }, ref) 
 DropdownMenuItem.displayName = 'DropdownMenuItem';
 
 const DropdownMenuSeparator = React.forwardRef(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.Separator ref={ref} className={cn('-mx-1 my-1 h-px bg-[#e6e6e6]', className)} {...props} />
+  <DropdownMenuPrimitive.Separator ref={ref} className={cn('-mx-1 my-1 h-px bg-rule', className)} {...props} />
 ));
 DropdownMenuSeparator.displayName = 'DropdownMenuSeparator';
 
 const DropdownMenuLabel = React.forwardRef(({ className, ...props }, ref) => (
-  <DropdownMenuPrimitive.Label ref={ref} className={cn('px-2 py-1.5 text-xs font-semibold text-slate-500', className)} {...props} />
+  <DropdownMenuPrimitive.Label ref={ref} className={cn('px-2 py-1.5 text-xs font-semibold text-ink-muted', className)} {...props} />
 ));
 DropdownMenuLabel.displayName = 'DropdownMenuLabel';
 

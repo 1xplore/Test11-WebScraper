@@ -11,8 +11,8 @@ const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) 
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      'flex h-9 w-full items-center justify-between rounded-md border border-[#e6e6e6] bg-white px-3 py-1 text-sm',
-      'placeholder:text-slate-400 focus:outline-none focus:border-[#0075de] focus:ring-2 focus:ring-[#0075de]/15',
+      'flex h-9 w-full items-center justify-between rounded-md border border-rule bg-surface px-3 text-sm',
+      'placeholder:text-ink-subtle focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20',
       'disabled:cursor-not-allowed disabled:opacity-50',
       className
     )}
@@ -20,7 +20,7 @@ const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) 
   >
     {children}
     <SelectPrimitive.Icon asChild>
-      <ChevronDown className="h-4 w-4 text-slate-400" />
+      <ChevronDown className="h-4 w-4 text-ink-subtle" />
     </SelectPrimitive.Icon>
   </SelectPrimitive.Trigger>
 ));
@@ -31,7 +31,7 @@ const SelectContent = React.forwardRef(({ className, children, position = 'poppe
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        'relative z-50 max-h-[400px] min-w-[8rem] overflow-hidden rounded-md border border-[#e6e6e6] bg-white shadow-md',
+        'relative z-50 max-h-[400px] min-w-[8rem] overflow-hidden rounded-md border border-rule bg-surface shadow-md',
         position === 'popper' && 'data-[side=bottom]:translate-y-1',
         className
       )}
@@ -50,8 +50,8 @@ const SelectItem = React.forwardRef(({ className, children, ...props }, ref) => 
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      'relative flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 pl-8 pr-2 text-sm outline-none',
-      'focus:bg-[#f6f5f4] data-[state=checked]:bg-[#dbeafe] data-[state=checked]:text-[#1e40af]',
+      'relative flex w-full cursor-pointer select-none items-center rounded-sm py-2 pl-8 pr-3 text-sm outline-none',
+      'focus:bg-surface-sunken data-[state=checked]:bg-accent-soft data-[state=checked]:text-info',
       className
     )}
     {...props}
