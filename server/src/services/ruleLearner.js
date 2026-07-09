@@ -34,14 +34,36 @@ function tagNormalize(s) {
 }
 
 /**
- * 把 "EPC|设计施工|..." -> /EPC|设计施工|.../
- * 元字符全 escape（reDoS 防御）
+ * Keywords syntax (loop 23)：
+ *   - `kw1|kw2|kw3`     OR 语义：任一 substring 命中即匹配（向后兼容）
+ *   - `kw1 & kw2 & kw3` AND 语义：所有 term 都 substring 命中才算匹配（顺序无关）
+ *   - 也支持混合：`kw1 | kw2&kw3 | kw4` —— 每段独立 OR，任一段通过即可
+ *
+ * 都做 regex 元字符 escape（reDoS 防御）
  */
 function compileKeywords(kwStr) {
-  const parts = String(kwStr).split('|').map((s) => s.trim()).filter(Boolean);
-  if (parts.length === 0) return /(?!.)/;  // 永不匹配
-  const escaped = parts.map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
-  return new RegExp(escaped.join('|'));
+  const raw = String(kwStr).trim();
+  if (!raw) return /(?!.)/;  // 永不匹配
+  // 按 | 切分顶级 OR 段；每段按 & 切分 AND term
+  const orSegments = raw.split('|').map((s) => s.trim()).filter(Boolean);
+  const compiledSegments = orSegments.map((segment) => {
+    const andTerms = segment.split('&').map((s) => s.trim()).filter(Boolean);
+    if (andTerms.length === 0) return null;
+    if (andTerms.length === 1) {
+      // 单 term 编译成 substring 匹配
+      const escaped = andTerms[0].replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp(escaped);
+    }
+    // 多 terms AND：用 lookahead 链（每个 term 必须匹配，不消耗字符）
+    const lookaheads = andTerms.map((t) => {
+      const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return `(?=.*${escaped})`;
+    });
+    return new RegExp(lookaheads.join(''));
+  }).filter(Boolean);
+  if (compiledSegments.length === 0) return /(?!.)/;
+  // 顶级 OR 段用 | 串联
+  return new RegExp(compiledSegments.map((re) => re.source).join('|'));
 }
 
 /**
