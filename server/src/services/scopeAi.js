@@ -67,6 +67,8 @@ async function learnFromMiss(announcementId) {
     '- keywords **必须字面命中**公告正文（不能造词、不能改写、不能是同义词）',
     '- 每个关键词 2~6 字，2~4 个足够（单字容易误命中，禁止）',
     '- tag 须在主营/不可做 tag 集合或现有清单内，不要凭空发明同义 tag',
+    '- keywords 语法：`kw1|kw2` OR 语义（任一命中）；`kw1&kw2` AND 语义（都需命中，顺序无关）；' +
+      '若全部 phrase 在 input 中以乱序出现（如"具备甲级岩土工程勘察资质"），推荐用 AND 把它们绑一起',
     '- 不要解释、不要寒暄，只返回 JSON',
   ].join('\n');
 

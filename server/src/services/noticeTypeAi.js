@@ -69,6 +69,8 @@ async function learnNoticeTypeFromMiss(announcementId) {
     '- keywords **必须字面命中**公告正文（不能造词、不能改写）',
     '- 每个关键词 2~6 字，2~4 个足够',
     '- tag 须在 SCOPE 列表或现有 tag 清单内，不要凭空发明',
+    '- keywords 语法：`kw1|kw2` OR；`kw1&kw2` AND（顺序无关）。' +
+      '公告文本里乱序短语可用 AND 绑一起',
     '- 不要解释、不要寒暄，只返回 JSON',
   ].join('\n');
 

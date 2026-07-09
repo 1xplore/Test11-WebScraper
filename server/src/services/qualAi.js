@@ -84,6 +84,8 @@ async function learnQualFromMiss(announcementId) {
     '- keywords **必须字面命中**资质要求文本（不能造词、不能改写、不能是同义词）',
     '- 每个关键词 2~8 字，2~4 个足够（行业资质名词较长是正常的）',
     '- tag 须在 SCOPE 列表或现有 tag 清单内，不要凭空发明',
+    '- keywords 语法：`kw1|kw2` OR；`kw1&kw2` AND（顺序无关）。' +
+      '资质文本里"具备甲级岩土工程勘察资质"这种乱序短语用 AND 绑一起',
     '- 不要解释、不要寒暄，只返回 JSON',
   ].join('\n');
 
