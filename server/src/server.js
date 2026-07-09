@@ -52,6 +52,7 @@ app.get('/api/enums', (req, res) => {
 });
 
 const { mutationsOnlyAuth } = require('./middleware/auth');
+const workerRouter = require('./routes/worker');
 // 注意 mount 语义：
 //   - /api/auth        不挂 auth（login 必须能公开访问，新用户能进）
 //   - /api/scrape-runs 不挂 auth（当前仅 GET 列表；未来若加 POST，回归此处）
@@ -68,6 +69,7 @@ app.use('/api/error-logs', mutationsOnlyAuth, errLogsRouter);
 app.use('/api/scrape-trigger', mutationsOnlyAuth, triggerRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/settings', mutationsOnlyAuth, settingsRouter);
+app.use('/api/worker', mutationsOnlyAuth, workerRouter);
 
 app.use((err, req, res, next) => {
   console.error('[api error]', err);

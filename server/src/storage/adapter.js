@@ -325,6 +325,27 @@ function listQualErrorLogs({ resolved = null, limit = 50 } = {}) {
   return db.prepare(sql).all(...params, limit);
 }
 
+function listNoticeTypeErrorLogs({ resolved = null, limit = 50 } = {}) {
+  const where = [];
+  const params = [];
+  if (resolved !== null) { where.push('resolved = ?'); params.push(resolved ? 1 : 0); }
+  const sql = `
+    SELECT ntel.*, a.title AS announcement_title
+    FROM notice_type_error_logs ntel
+    LEFT JOIN announcements a ON a.id = ntel.announcement_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY ntel.created_at DESC LIMIT ?`;
+  return db.prepare(sql).all(...params, limit);
+}
+
+function resolveNoticeTypeError(id, { ruleId, tag } = {}) {
+  db.prepare(
+    `UPDATE notice_type_error_logs SET resolved = 1, resolved_rule_id = ?, resolved_tag = ?
+     WHERE id = ?`
+  ).run(ruleId || null, tag || null, id);
+  return db.prepare('SELECT * FROM notice_type_error_logs WHERE id = ?').get(id);
+}
+
 function resolveScopeError(id, { ruleId, tag } = {}) {
   db.prepare(
     `UPDATE scope_error_logs SET resolved = 1, resolved_rule_id = ?, resolved_tag = ?
@@ -339,6 +360,8 @@ function getErrorLogCounts() {
     scope_total: db.prepare('SELECT COUNT(*) AS n FROM scope_error_logs').get().n,
     qual_unresolved: db.prepare('SELECT COUNT(*) AS n FROM qual_error_logs WHERE resolved = 0').get().n,
     qual_total: db.prepare('SELECT COUNT(*) AS n FROM qual_error_logs').get().n,
+    notice_type_unresolved: db.prepare('SELECT COUNT(*) AS n FROM notice_type_error_logs WHERE resolved = 0').get().n,
+    notice_type_total: db.prepare('SELECT COUNT(*) AS n FROM notice_type_error_logs').get().n,
   };
 }
 
@@ -644,6 +667,10 @@ module.exports = {
   registerNoticeTypeRulesCacheInvalidator, invalidateNoticeTypeRulesCache,
   // announcement tag patches
   patchAnnouncementQual, patchAnnouncementNoticeType,
+  // feedback logs
+  writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeFeedbackLogs,
+  listScopeErrorLogs, listQualErrorLogs, listNoticeTypeErrorLogs,
+  resolveScopeError, resolveNoticeTypeError, getErrorLogCounts,
   // scrape runs
   getLastScrapeTime, createScrapeRun, listScrapeRuns,
   // users
