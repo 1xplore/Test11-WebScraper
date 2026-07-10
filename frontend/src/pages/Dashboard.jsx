@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { RefreshCw, ArrowUpDown } from 'lucide-react';
+import { RefreshCw, ArrowUpDown, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Download } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -8,6 +8,7 @@ import AggregationStrip from '@/components/AggregationStrip.jsx';
 import FilterBar from '@/components/FilterBar.jsx';
 import AnnouncementCard from '@/components/AnnouncementCard.jsx';
 import AnnouncementDetail from '@/components/AnnouncementDetail.jsx';
+import TrendChart from '@/components/TrendChart.jsx';
 import { fetcher } from '@/lib/api';
 
 const SORT_OPTIONS = [
@@ -20,6 +21,8 @@ const SORT_OPTIONS = [
 
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
+  const [trend, setTrend] = useState(null);    // Loop 37: AI 学习时序
+  const [trendDays, setTrendDays] = useState(7);
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -42,15 +45,17 @@ export default function Dashboard() {
         pageSize: PAGE_SIZE,
       };
       Object.keys(params).forEach((k) => { if (params[k] == null || params[k] === '') delete params[k]; });
-      const [statsData, listData, platData] = await Promise.all([
+      const [statsData, listData, platData, trendData] = await Promise.all([
         fetcher.getStats(),
         fetcher.listAnnouncements(params),
         fetcher.listPlatforms(),
+        fetcher.getDashboardTrend({ days: trendDays }),
       ]);
       setStats(statsData);
       setItems(listData.items);
       setTotal(listData.total);
       setPlatforms(platData);
+      setTrend(trendData);
     } finally {
       setLoading(false);
     }
@@ -70,6 +75,7 @@ export default function Dashboard() {
   return (
     <>
       <StatStrip stats={stats} />
+      <TrendChart trend={trend} days={trendDays} onDaysChange={setTrendDays} />
       <AggregationStrip
         stats={stats}
         platforms={platforms}

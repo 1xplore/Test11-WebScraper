@@ -45,6 +45,8 @@ export const auth = {
 
 export const fetcher = {
   getStats: () => api.get('/stats').then((r) => r.data),
+  getDashboardSummary: () => api.get('/dashboard/summary').then((r) => r.data),
+  getDashboardTrend: ({ days = 7 } = {}) => api.get('/dashboard/trend', { params: { days } }).then((r) => r.data),
   getEnums: () => api.get('/enums').then((r) => r.data),
   listAnnouncements: (params) =>
     api.get('/announcements', { params }).then((r) => r.data),
