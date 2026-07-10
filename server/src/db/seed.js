@@ -111,6 +111,36 @@ const QUAL_RULES_SEED = [
   { priority: 10, tag: '全过程工程咨询',         keywords: '全过程工程咨询|全过程咨询', source: 'seed' },
 ];
 
+// Loop 34: 区域（district）种子 —— 22 项武汉区/主要街道
+// 关键词用整词短语（OR-split 仅限同义简写）
+const DISTRICT_RULES_SEED = [
+  // 13 个市辖区
+  { priority: 10, tag: '江岸区',         keywords: '江岸|二七|谌家矶|塔子湖|后湖',          source: 'seed' },
+  { priority: 10, tag: '江汉区',         keywords: '江汉|北湖|唐家墩|常青|万松',          source: 'seed' },
+  { priority: 10, tag: '硚口区',         keywords: '硚口|汉水桥|宝丰|宗关|易家墩',        source: 'seed' },
+  { priority: 10, tag: '汉阳区',         keywords: '汉阳|琴台|四新|永丰|江堤',            source: 'seed' },
+  { priority: 10, tag: '武昌区',         keywords: '武昌|中南路|水果湖|积玉桥|黄鹤楼',    source: 'seed' },
+  { priority: 10, tag: '青山区',         keywords: '青山|红钢城|新沟桥|冶金|工业大道',    source: 'seed' },
+  { priority: 10, tag: '洪山区',         keywords: '洪山|珞南|关山|卓刀泉|街道口',        source: 'seed' },
+  { priority: 10, tag: '东西湖区',       keywords: '东西湖|吴家山|金银潭|常青花园|将军路', source: 'seed' },
+  { priority: 10, tag: '汉南区',         keywords: '汉南|纱帽|东荆|湘口',                  source: 'seed' },
+  { priority: 10, tag: '蔡甸区',         keywords: '蔡甸|奓山|大集|永安|侏儒',            source: 'seed' },
+  { priority: 10, tag: '江夏区',         keywords: '江夏|纸坊|金口|郑店|乌龙泉',          source: 'seed' },
+  { priority: 10, tag: '黄陂区',         keywords: '黄陂|前川|盘龙城|滠口|武湖',          source: 'seed' },
+  { priority: 10, tag: '新洲区',         keywords: '新洲|邾城|阳逻|双柳|仓埠',            source: 'seed' },
+  // 3 个功能区
+  { priority: 10, tag: '东湖高新区',     keywords: '东湖高新|光谷|武汉东湖|左岭|花山',   source: 'seed' },
+  { priority: 10, tag: '武汉经开区',     keywords: '武汉经开|沌口|军山|汉南|纱帽',         source: 'seed' },
+  { priority: 10, tag: '东湖风景区',     keywords: '东湖风景|听涛|磨山|落雁|吹笛',       source: 'seed' },
+  // 6 个主要街道/开发区（scraper 偶有 address 简写）
+  { priority: 10, tag: '江汉经济开发区', keywords: '江汉经开|经济开发区',                  source: 'seed' },
+  { priority: 10, tag: '金银潭',         keywords: '金银潭|常青花园|将军路',              source: 'seed' },
+  { priority: 10, tag: '盘龙城',         keywords: '盘龙城|黄陂盘龙',                      source: 'seed' },
+  { priority: 10, tag: '滠口',           keywords: '滠口|黄陂滠口',                        source: 'seed' },
+  { priority: 10, tag: '阳逻',           keywords: '阳逻|新洲阳逻',                        source: 'seed' },
+  { priority: 10, tag: '邾城',           keywords: '邾城|新洲邾城',                        source: 'seed' },
+];
+
 // 公告类型种子（loop 16）—— 让 inferNoticeType 首次就有命中
 const NOTICE_TYPE_RULES_SEED = [
   { priority: 10, tag: '采购公告',         keywords: '采购公告',           source: 'seed' },
@@ -196,6 +226,21 @@ function seed(db) {
     console.log(`[seed] 植入 ${NOTICE_TYPE_RULES_SEED.length} 条公告类型规则`);
   } else {
     console.log(`[seed] notice_type_rules 已有 ${ntCount} 条 seed 记录，跳过`);
+  }
+
+  // Loop 34: 区域规则 seed
+  const districtCount = db.prepare("SELECT COUNT(*) AS n FROM district_rules WHERE source = 'seed'").get().n;
+  if (districtCount === 0) {
+    const insD = db.prepare(
+      'INSERT INTO district_rules (priority, tag, keywords, enabled, source) VALUES (?, ?, ?, 1, ?)'
+    );
+    const txD = db.transaction((rows) => rows.forEach((r) =>
+      insD.run(r.priority, r.tag, r.keywords, r.source)
+    ));
+    txD(DISTRICT_RULES_SEED);
+    console.log(`[seed] 植入 ${DISTRICT_RULES_SEED.length} 条区域规则`);
+  } else {
+    console.log(`[seed] district_rules 已有 ${districtCount} 条 seed 记录，跳过`);
   }
 }
 
