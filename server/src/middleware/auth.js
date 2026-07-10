@@ -12,6 +12,15 @@
 
 const storage = require('../storage/adapter');
 
+// Loop 30: token TTL 防御（修 loop 9 audit F3 项目级安全债）
+//   缺省 30 天，可 env 覆盖：AUTH_TOKEN_TTL_DAYS
+//   旧 token 因无 token_created_at 列（loop 30 ALTER 之前入库的）→ 视为 created_at
+//   超过 TTL → 401 + 提示 token_expired，前端 re-login
+const TOKEN_TTL_DAYS = (() => {
+  const v = parseInt(process.env.AUTH_TOKEN_TTL_DAYS || '30', 10);
+  return Number.isFinite(v) && v > 0 ? v : 30;
+})();
+
 function getBearerToken(req) {
   const h = req.headers.authorization || '';
   if (!h.startsWith('Bearer ')) return null;
@@ -31,6 +40,18 @@ function requireAuth(req, res, next) {
   const user = storage.getUserByToken(token);
   if (!user) {
     return res.status(401).json({ error: 'Unauthorized', reason: 'invalid_token' });
+  }
+  // Loop 30: token TTL 检查
+  const baseTs = user.token_created_at || user.created_at;
+  if (baseTs) {
+    const ageDays = (Date.now() - new Date(baseTs).getTime()) / 86400_000;
+    if (ageDays > TOKEN_TTL_DAYS) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        reason: 'token_expired',
+        message: `Token 已过期（${Math.round(ageDays)} 天 > ${TOKEN_TTL_DAYS} 天 TTL），请重新登录`,
+      });
+    }
   }
   req.user = user;
   next();

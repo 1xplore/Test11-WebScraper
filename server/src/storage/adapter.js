@@ -591,8 +591,9 @@ function findOrCreateUser(username, displayName = null) {
     return user;
   }
   const token = `tok_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  // Loop 30: 新建 user 时记 token_created_at（TTL 防御）
   const info = db.prepare(
-    'INSERT INTO users (username, display_name, token) VALUES (?, ?, ?)'
+    'INSERT INTO users (username, display_name, token, token_created_at) VALUES (?, ?, ?, datetime(\'now\'))'
   ).run(username, displayName || username, token);
   user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
   return user;

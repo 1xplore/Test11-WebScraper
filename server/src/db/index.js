@@ -51,6 +51,12 @@ function migrate() {
     db.exec("ALTER TABLE notice_type_rules ADD COLUMN updated_at TEXT NOT NULL DEFAULT (datetime('now'))");
   }
 
+  // Loop 30: users.token_created_at (TTL 防御)
+  const userCols = db.prepare('PRAGMA table_info(users)').all().map((c) => c.name);
+  if (!userCols.includes('token_created_at')) {
+    db.exec("ALTER TABLE users ADD COLUMN token_created_at TEXT");
+  }
+
   // AI 沉淀去重索引：partial UNIQUE on (tag, keywords) WHERE source='ai-learned'
   // 必须在 source 列就位之后；schema.sql 的 IF NOT EXISTS 不够（老库没列就 fail）
   db.exec(

@@ -199,7 +199,8 @@ CREATE TABLE IF NOT EXISTS users (
   display_name    TEXT,
   token           TEXT    UNIQUE NOT NULL,
   created_at      TEXT NOT NULL DEFAULT (datetime('now')),
-  last_seen_at    TEXT
+  last_seen_at    TEXT,
+  token_created_at TEXT                                -- Loop 30：TTL 防御用
 );
 
 CREATE INDEX IF NOT EXISTS idx_users_token ON users(token);
