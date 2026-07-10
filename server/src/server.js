@@ -29,24 +29,48 @@ const matching = require('./services/matching');
 const storage = require('./storage/adapter');
 
 const app = express();
-// Loop 28: CORS 锁白名单（修 loop 9 audit F3 项目级债）
-//   之前 `cors()` 全开 + 全局 token 一起有 CSRF 风险
-//   现在 origin 白名单：环境变量 ALLOWED_ORIGINS（逗号分隔）
-//   缺省值：本地开发（localhost:5173/4173）+ production 域名
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || [
-  'http://localhost:5173',
-  'http://localhost:4173',
-  'https://bid.1xplore.cn',
-].join(',')).split(',').map((s) => s.trim()).filter(Boolean);
-app.use(cors({
-  origin: (origin, cb) => {
-    // 同源请求（curl / server-side）无 Origin header → 允许
-    if (!origin) return cb(null, true);
-    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
-    return cb(new Error(`CORS: origin ${origin} not allowed`));
-  },
-  credentials: true,
-}));
+// Loop 28: CORS 锁白名单（修 loop 9 audit F3 项目级安全债）
+// Loop 33: /api/dashboard 公开（聚合数据无 PII），其它路径 ALLOWED_ORIGINS 白名单
+// 用自写中间件（cors 包 origin 回调拿不到 req.path，自己 dispatch）
+function parseList(env, fallback) {
+  return (env || fallback).split(',').map((s) => s.trim()).filter(Boolean);
+}
+const ALLOWED_ORIGINS = parseList(process.env.ALLOWED_ORIGINS, [
+  'http://localhost:5173', 'http://localhost:4173', 'https://bid.1xplore.cn',
+].join(','));
+const DASHBOARD_CORS_RAW = (process.env.DASHBOARD_CORS_ORIGINS || '*').trim();
+const DASHBOARD_OPEN_ALL = DASHBOARD_CORS_RAW === '*';
+const DASHBOARD_ORIGINS = DASHBOARD_OPEN_ALL ? null : parseList(DASHBOARD_CORS_RAW, '');
+
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  if (!origin) return next();                        // 同源 / curl / server-side
+  if (req.path.startsWith('/api/dashboard')) {
+    if (DASHBOARD_OPEN_ALL) {
+      res.setHeader('Access-Control-Allow-Origin', '*');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      return req.method === 'OPTIONS' ? res.sendStatus(204) : next();
+    }
+    if (DASHBOARD_ORIGINS.includes(origin)) {
+      res.setHeader('Access-Control-Allow-Origin', origin);
+      res.setHeader('Vary', 'Origin');
+      res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+      res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+      return req.method === 'OPTIONS' ? res.sendStatus(204) : next();
+    }
+    return res.status(500).json({ error: 'CORS dashboard: origin not allowed' });
+  }
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    return req.method === 'OPTIONS' ? res.sendStatus(204) : next();
+  }
+  return res.status(500).json({ error: 'CORS: origin not allowed' });
+});
 app.use(express.json({ limit: '2mb' }));
 app.use(morgan('tiny'));
 
@@ -104,7 +128,8 @@ app.use('/api/scrape-trigger', mutationsOnlyAuth, triggerRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/settings', mutationsOnlyAuth, settingsRouter);
 app.use('/api/worker', mutationsOnlyAuth, workerRouter);
-app.use('/api/dashboard', dashboardRouter);  // GET 公开（无 mutation）
+// Loop 33: dashboard 路径已通过全局 CORS callback 单独放行；无需再挂 cors 中间件
+app.use('/api/dashboard', dashboardRouter);
 app.use('/api/district-rules', mutationsOnlyAuth, districtRouter);
 
 app.use((err, req, res, next) => {
