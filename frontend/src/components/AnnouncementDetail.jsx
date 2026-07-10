@@ -30,6 +30,16 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
   const [learnQualLoading, setLearnQualLoading] = useState(false);
   const [learnNoticeTypeResult, setLearnNoticeTypeResult] = useState(null);
   const [learnNoticeTypeLoading, setLearnNoticeTypeLoading] = useState(false);
+
+  // Loop 29: 命中判断（"AI 学一下"是否还该显示）
+  // - scope_tags: 空 / ['其他'] / ['未匹配'] → 未命中
+  // - qual_tags: 空 / ['未匹配'] → 未命中
+  // - notice_type_tags: 空数组 → 未命中
+  const isScopeMiss = !item?.scope_tags
+    || (item.scope_tags.length === 1 && ['其他', '未匹配'].includes(item.scope_tags[0]));
+  const isQualMiss = !item?.qual_tags
+    || (item.qual_tags.length === 1 && item.qual_tags[0] === '未匹配');
+  const isNoticeTypeMiss = !item?.notice_type_tags || item.notice_type_tags.length === 0;
   const [saving, setSaving] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
 
@@ -239,6 +249,11 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
               <div>
                 <Brain className="h-3.5 w-3.5 inline mr-1 text-accent" />
                 <span className="ai-banner-text">AI 学一下（自迭代沉淀）</span>
+                {!isScopeMiss && item?.scope_tags?.length > 0 && (
+                  <span className="ml-3 text-success-fg text-xs">
+                    ✓ 已推断：{item.scope_tags.join('、')}
+                  </span>
+                )}
                 {learnResult?.applied && (
                   <span className="ml-3 text-success-fg">
                     沉淀成功：tag=<b>{learnResult.rule?.tag}</b>，关键词={JSON.stringify(learnResult.rule?.keywords)}
@@ -252,15 +267,17 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                   <span className="ml-3 text-danger">{learnResult.error}</span>
                 )}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
-                onClick={runLearnFromMiss}
-                title="让 AI 判断此公告应归哪个 tag、并沉淀让算法自动覆盖此类的关键词"
-              >
-                {learnLoading ? '学习中…' : 'AI 学一下'}
-              </Button>
+              {isScopeMiss && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
+                  onClick={runLearnFromMiss}
+                  title="让 AI 判断此公告应归哪个 tag、并沉淀让算法自动覆盖此类的关键词"
+                >
+                  {learnLoading ? '学习中…' : 'AI 学一下'}
+                </Button>
+              )}
             </div>
 
             {/* AI 学一下（资质） —— 自迭代：让 AI 提议本公告要求的资质类别 + 沉淀 qual_rules */}
@@ -268,6 +285,11 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
               <div>
                 <Brain className="h-3.5 w-3.5 inline mr-1 text-accent" />
                 <span className="ai-banner-text">AI 学一下（资质）</span>
+                {!isQualMiss && item?.qual_tags?.length > 0 && (
+                  <span className="ml-3 text-success-fg text-xs">
+                    ✓ 已推断：{item.qual_tags.join('、')}
+                  </span>
+                )}
                 {learnQualResult?.applied && (
                   <span className="ml-3 text-success-fg">
                     沉淀成功：tag=<b>{learnQualResult.rule?.tag}</b>，关键词={JSON.stringify(learnQualResult.rule?.keywords)}
@@ -283,15 +305,17 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                   <span className="ml-3 text-danger">{learnQualResult.error}</span>
                 )}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
-                onClick={runLearnQualFromMiss}
-                title="让 AI 从公告 requirement 中提炼资质类别、沉淀 qual_rules"
-              >
-                {learnQualLoading ? '学资质中…' : 'AI 学资质'}
-              </Button>
+              {isQualMiss && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
+                  onClick={runLearnQualFromMiss}
+                  title="让 AI 从公告 requirement 中提炼资质类别、沉淀 qual_rules"
+                >
+                  {learnQualLoading ? '学资质中…' : 'AI 学资质'}
+                </Button>
+              )}
             </div>
 
             {/* AI 学一下（公告类型） —— 自迭代第三套：让 AI 提议 type + 沉淀 notice_type_rules */}
@@ -299,6 +323,11 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
               <div>
                 <Brain className="h-3.5 w-3.5 inline mr-1 text-accent" />
                 <span className="ai-banner-text">AI 学一下（公告类型）</span>
+                {!isNoticeTypeMiss && item?.notice_type_tags?.length > 0 && (
+                  <span className="ml-3 text-success-fg text-xs">
+                    ✓ 已推断：{item.notice_type_tags.join('、')}
+                  </span>
+                )}
                 {learnNoticeTypeResult?.applied && (
                   <span className="ml-3 text-success-fg">
                     沉淀成功：tag=<b>{learnNoticeTypeResult.rule?.tag}</b>，关键词={JSON.stringify(learnNoticeTypeResult.rule?.keywords)}
@@ -313,15 +342,17 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                   <span className="ml-3 text-danger">{learnNoticeTypeResult.error}</span>
                 )}
               </div>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
-                onClick={runLearnNoticeTypeFromMiss}
-                title="让 AI 判断本公告类型（如招标公告/资格预审公告/竞争性磋商公告）、沉淀 notice_type_rules"
-              >
-                {learnNoticeTypeLoading ? '学类型中…' : 'AI 学类型'}
-              </Button>
+              {isNoticeTypeMiss && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading}
+                  onClick={runLearnNoticeTypeFromMiss}
+                  title="让 AI 判断本公告类型（如招标公告/资格预审公告/竞争性磋商公告）、沉淀 notice_type_rules"
+                >
+                  {learnNoticeTypeLoading ? '学类型中…' : 'AI 学类型'}
+                </Button>
+              )}
             </div>
 
             {/* 字段 */}
