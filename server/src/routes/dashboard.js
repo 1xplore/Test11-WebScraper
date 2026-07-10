@@ -57,4 +57,33 @@ router.get('/summary', (req, res) => {
   });
 });
 
+// Loop 31: 时序端点（最近 N 天 AI 学习数 / 每天 / 每 rule_type）
+router.get('/trend', (req, res) => {
+  const days = Math.min(parseInt(req.query.days || '7', 10) || 7, 90);
+  const rows = storage.getAILearnedHistory({ days });
+  // 重组为 {days: [...], by_type: {scope: [...], qual: [...], notice_type: [...]}}
+  const daySet = new Set();
+  for (const r of rows) daySet.add(r.day);
+  const dayList = [...daySet].sort();
+  const byType = {
+    scope: Array(dayList.length).fill(0),
+    qual: Array(dayList.length).fill(0),
+    notice_type: Array(dayList.length).fill(0),
+  };
+  const idxByDay = Object.fromEntries(dayList.map((d, i) => [d, i]));
+  for (const r of rows) {
+    if (byType[r.rule_type]) byType[r.rule_type][idxByDay[r.day]] = r.n;
+  }
+  res.json({
+    days: dayList,
+    by_type: byType,
+    totals: {
+      scope: byType.scope.reduce((a, b) => a + b, 0),
+      qual: byType.qual.reduce((a, b) => a + b, 0),
+      notice_type: byType.notice_type.reduce((a, b) => a + b, 0),
+    },
+    generatedAt: new Date().toISOString(),
+  });
+});
+
 module.exports = router;

@@ -366,6 +366,27 @@ function writeQualErrorLog(announcementId, rawText) {
   ).run(announcementId, rawText).lastInsertRowid;
 }
 
+// Loop 31: AI 学成功历史（dashboard 时序数据源）
+function recordAILearnedHistory(ruleType, tag, announcementId) {
+  return db.prepare(
+    'INSERT INTO ai_learned_history (rule_type, tag, announcement_id) VALUES (?, ?, ?)'
+  ).run(ruleType, tag, announcementId || null).lastInsertRowid;
+}
+
+// 查最近 N 天每天每类 AI 学习数（按天+rule_type GROUP BY）
+function getAILearnedHistory({ days = 7 } = {}) {
+  return db.prepare(`
+    SELECT
+      date(learned_at) AS day,
+      rule_type,
+      COUNT(*) AS n
+    FROM ai_learned_history
+    WHERE learned_at >= datetime('now', '-' || ? || ' days')
+    GROUP BY day, rule_type
+    ORDER BY day DESC, rule_type
+  `).all(days);
+}
+
 function listScopeErrorLogs({ resolved = null, limit = 50 } = {}) {
   const where = [];
   const params = [];
@@ -704,6 +725,8 @@ module.exports = {
   // feedback logs
   writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeFeedbackLogs,
   listScopeErrorLogs, listQualErrorLogs, resolveScopeError, getErrorLogCounts,
+  // Loop 31: AI 学习历史 + 时序查询
+  recordAILearnedHistory, getAILearnedHistory,
   // scope rules
   listScopeRules, patchScopeRule, createScopeRule,
   // cache invalidator registry
@@ -722,6 +745,8 @@ module.exports = {
   writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeFeedbackLogs,
   listScopeErrorLogs, listQualErrorLogs, listNoticeTypeErrorLogs,
   resolveScopeError, resolveNoticeTypeError, getErrorLogCounts,
+  // Loop 31: AI 学习历史（dashboard 时序）
+  recordAILearnedHistory, getAILearnedHistory,
   // scrape runs
   getLastScrapeTime, createScrapeRun, listScrapeRuns,
   // users

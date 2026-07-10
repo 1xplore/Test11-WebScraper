@@ -180,6 +180,8 @@ async function learnNoticeTypeFromMiss(announcementId) {
   const freshRules = storage.listNoticeTypeRules({ enabledOnly: true });
   const newTags = matching.inferNoticeType(text, ruleLearner.buildDynamicRules(freshRules));
   storage.patchAnnouncementNoticeType(ann.id, newTags);
+  // Loop 31: 写 AI 学习历史
+  storage.recordAILearnedHistory('notice_type', finalTag, ann.id);
 
   return {
     applied: true,

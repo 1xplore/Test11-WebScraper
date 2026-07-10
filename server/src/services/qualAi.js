@@ -197,6 +197,8 @@ async function learnQualFromMiss(announcementId) {
   const freshRules = storage.listQualRules({ enabledOnly: true });
   const refreshedQualTags = matching.inferQual(text, ruleLearner.buildDynamicRules(freshRules));
   storage.patchAnnouncementQual(ann.id, refreshedQualTags);
+  // Loop 31: 写 AI 学习历史
+  storage.recordAILearnedHistory('qual', finalTag, ann.id);
 
   return {
     applied: true,

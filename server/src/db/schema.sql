@@ -215,3 +215,16 @@ CREATE TABLE IF NOT EXISTS system_settings (
   updated_by      INTEGER REFERENCES users(id)
 );
 
+-- Loop 31：AI 自迭代学习历史（dashboard 时序数据源）
+-- 每次 scopeAi/qualAi/noticeTypeAi 学成功时 INSERT 一行
+CREATE TABLE IF NOT EXISTS ai_learned_history (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  learned_at       TEXT NOT NULL DEFAULT (datetime('now')),
+  rule_type        TEXT NOT NULL,                       -- scope / qual / notice_type
+  tag              TEXT NOT NULL,
+  announcement_id  INTEGER,
+  source          TEXT NOT NULL DEFAULT 'ai-learned'
+);
+CREATE INDEX IF NOT EXISTS idx_ai_history_learned_at ON ai_learned_history(learned_at);
+CREATE INDEX IF NOT EXISTS idx_ai_history_rule_type  ON ai_learned_history(rule_type, learned_at);
+

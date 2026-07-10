@@ -192,6 +192,8 @@ async function learnFromMiss(announcementId) {
     scope_tags: newTags,
     business_match: businessMatch,
   });
+  // Loop 31: 写 AI 学习历史（dashboard 时序用）
+  storage.recordAILearnedHistory('scope', finalTag, ann.id);
 
   return {
     applied: true,
