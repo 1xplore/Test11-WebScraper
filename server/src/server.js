@@ -86,6 +86,7 @@ app.get('/api/enums', (req, res) => {
 const { mutationsOnlyAuth } = require('./middleware/auth');
 const workerRouter = require('./routes/worker');
 const dashboardRouter = require('./routes/dashboard');
+const districtRouter = require('./routes/district-rules');
 // 注意 mount 语义：
 //   - /api/auth        不挂 auth（login 必须能公开访问，新用户能进）
 //   - /api/scrape-runs 不挂 auth（当前仅 GET 列表；未来若加 POST，回归此处）
@@ -104,6 +105,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/settings', mutationsOnlyAuth, settingsRouter);
 app.use('/api/worker', mutationsOnlyAuth, workerRouter);
 app.use('/api/dashboard', dashboardRouter);  // GET 公开（无 mutation）
+app.use('/api/district-rules', mutationsOnlyAuth, districtRouter);
 
 app.use((err, req, res, next) => {
   console.error('[api error]', err);

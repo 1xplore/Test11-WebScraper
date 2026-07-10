@@ -210,6 +210,44 @@ function inferNoticeType(text, dynamicRules = null) {
   return tags;
 }
 
+// ---------- 区域（district_rules）正则匹配 —— 第四套 self-growth (Loop 32) ----------
+
+const _districtRulesCache = { value: null, at: 0 };
+function loadActiveDistrictRules() {
+  const now = Date.now();
+  if (_districtRulesCache.value && now - _districtRulesCache.at < 30_000) {
+    return _districtRulesCache.value;
+  }
+  const rows = storage.listDistrictRules({ enabledOnly: true });
+  const rules = rows.map((r) => ({
+    priority: r.priority,
+    tag: r.tag,
+    regex: compileKeywords(r.keywords),
+  }));
+  _districtRulesCache.value = rules;
+  _districtRulesCache.at = now;
+  return rules;
+}
+
+function invalidateDistrictRulesCache() {
+  _districtRulesCache.value = null;
+  _districtRulesCache.at = 0;
+}
+
+try {
+  storage.registerDistrictRulesCacheInvalidator(invalidateDistrictRulesCache);
+} catch (_) { /* bootstrap 阶段静默 */ }
+
+function inferDistrict(text, dynamicRules = null) {
+  const rules = dynamicRules || loadActiveDistrictRules();
+  if (!rules.length) return [];
+  const tags = [];
+  for (const r of rules) {
+    if (r.regex.test(text)) tags.push(r.tag);
+  }
+  return tags;
+}
+
 function inferBusinessMatch(scopeTags) {
   if (!scopeTags || scopeTags.length === 0) return '待评估';
   const hasIn = scopeTags.some((t) => IN_SCOPE.has(t));
@@ -443,12 +481,14 @@ module.exports = {
   inferScope,
   inferQual,
   inferNoticeType,
+  inferDistrict,                                  // Loop 32 第四套
   inferBusinessMatch,
   inferProgress,
   compileKeywords,
   invalidateScopeRulesCache,
   invalidateQualRulesCache,
   invalidateNoticeTypeRulesCache,
+  invalidateDistrictRulesCache,                  // Loop 32 第四套
   computeLocalScore,
   aiRefine,
   testAiConnection,

@@ -220,7 +220,7 @@ CREATE TABLE IF NOT EXISTS system_settings (
 CREATE TABLE IF NOT EXISTS ai_learned_history (
   id               INTEGER PRIMARY KEY AUTOINCREMENT,
   learned_at       TEXT NOT NULL DEFAULT (datetime('now')),
-  rule_type        TEXT NOT NULL,                       -- scope / qual / notice_type
+  rule_type        TEXT NOT NULL,                       -- scope / qual / notice_type / district
   tag              TEXT NOT NULL,
   announcement_id  INTEGER,
   source          TEXT NOT NULL DEFAULT 'ai-learned'
@@ -228,3 +228,37 @@ CREATE TABLE IF NOT EXISTS ai_learned_history (
 CREATE INDEX IF NOT EXISTS idx_ai_history_learned_at ON ai_learned_history(learned_at);
 CREATE INDEX IF NOT EXISTS idx_ai_history_rule_type  ON ai_learned_history(rule_type, learned_at);
 
+
+-- ---------- 区域（district_rules）—— 第四套 self-growth (Loop 32) ----------
+-- scraper 当前 address 字段未解析 district；让 AI 从 address 抽取行政区/街道
+CREATE TABLE IF NOT EXISTS district_rules (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  priority        REAL NOT NULL,
+  tag             TEXT NOT NULL,                          -- 行政区/街道名
+  keywords        TEXT NOT NULL,                          -- substring 匹配
+  enabled         INTEGER NOT NULL DEFAULT 1,
+  source          TEXT NOT NULL DEFAULT 'manual',         -- seed / manual / imported / ai-learned
+  created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at      TEXT NOT NULL DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_district_priority ON district_rules(priority);
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_ai_learned_district_tag_kw
+  ON district_rules(tag, keywords) WHERE source = 'ai-learned';
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_seed_district_tag
+  ON district_rules(tag) WHERE source = 'seed';
+
+-- 区域错误日志（与 scope/qual/notice_type 平行）
+CREATE TABLE IF NOT EXISTS district_error_logs (
+  id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+  announcement_id     INTEGER REFERENCES announcements(id) ON DELETE CASCADE,
+  raw_text            TEXT NOT NULL,
+  resolved            INTEGER NOT NULL DEFAULT 0,
+  resolved_rule_id    INTEGER REFERENCES district_rules(id),
+  resolved_tag        TEXT,
+  created_at          TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- announcements.district_tags 列（loop 32: 第四套自迭代回写）
+-- 注意：announcements.district 字段早已存在（JSON array，loop 之前 schema）；
+-- 这里只迁移"AI 提取"单独列（如 announce 有别于 scraper 提取）
+-- 实际项目可省此列；保留以备

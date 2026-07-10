@@ -559,6 +559,50 @@ const createQualRule = qualRulesOps.create;
 const registerQualRulesCacheInvalidator = qualRulesOps.registerCacheInvalidator;
 const invalidateQualRulesCache = qualRulesOps.invalidateCache;
 
+// Loop 32: 第四套 self-growth（district）
+const districtRulesOps = _ruleOpsFactory('district_rules', {
+  allowedCols: ['priority', 'tag', 'keywords', 'enabled', 'source'],
+  boolCols: ['enabled'],
+});
+const listDistrictRules = districtRulesOps.list;
+const patchDistrictRule = districtRulesOps.patch;
+const createDistrictRule = districtRulesOps.create;
+const registerDistrictRulesCacheInvalidator = districtRulesOps.registerCacheInvalidator;
+const invalidateDistrictRulesCache = districtRulesOps.invalidateCache;
+
+// district infer（regex 匹配 address 文本）
+function inferDistrict(text, dynamicRules = null) {
+  const rules = dynamicRules || (() => {
+    const cached = storage.getActiveDistrictRules?.() || listDistrictRules({ enabledOnly: true });
+    return cached;
+  })();
+  if (!rules || !rules.length) return [];
+  const tags = [];
+  for (const r of rules) {
+    if (r.regex.test(text)) tags.push(r.tag);
+  }
+  return tags;
+}
+
+function writeDistrictErrorLog(announcementId, rawText) {
+  return db.prepare(
+    'INSERT INTO district_error_logs (announcement_id, raw_text) VALUES (?, ?)'
+  ).run(announcementId, rawText).lastInsertRowid;
+}
+
+function listDistrictErrorLogs({ resolved = null, limit = 50 } = {}) {
+  const where = [];
+  const params = [];
+  if (resolved !== null) { where.push('resolved = ?'); params.push(resolved ? 1 : 0); }
+  const sql = `
+    SELECT del.*, a.title AS announcement_title
+    FROM district_error_logs del
+    LEFT JOIN announcements a ON a.id = del.announcement_id
+    ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+    ORDER BY del.created_at DESC LIMIT ?`;
+  return db.prepare(sql).all(...params, limit);
+}
+
 const noticeTypeRulesOps = _ruleOpsFactory('notice_type_rules', {
   allowedCols: ['priority', 'tag', 'keywords', 'enabled', 'source'],
   boolCols: ['enabled'],
@@ -723,7 +767,7 @@ module.exports = {
   findExisting, upsertAnnouncement, listAnnouncements, getAnnouncement,
   patchAnnouncementReview, patchAnnouncementScope, markReviewed,
   // feedback logs
-  writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeFeedbackLogs,
+  writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeDistrictErrorLog, writeFeedbackLogs,
   listScopeErrorLogs, listQualErrorLogs, resolveScopeError, getErrorLogCounts,
   // Loop 31: AI 学习历史 + 时序查询
   recordAILearnedHistory, getAILearnedHistory,
@@ -737,13 +781,16 @@ module.exports = {
   // notice_type rules
   listNoticeTypeRules, patchNoticeTypeRule, createNoticeTypeRule,
   registerNoticeTypeRulesCacheInvalidator, invalidateNoticeTypeRulesCache,
+  // Loop 32: district rules
+  listDistrictRules, patchDistrictRule, createDistrictRule,
+  registerDistrictRulesCacheInvalidator, invalidateDistrictRulesCache,
   // announcement tag patches
   patchAnnouncementQual, patchAnnouncementNoticeType,
   // backfill (loop 18)
   backfillAnnouncementTags,
   // feedback logs
-  writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeFeedbackLogs,
-  listScopeErrorLogs, listQualErrorLogs, listNoticeTypeErrorLogs,
+  writeScopeErrorLog, writeQualErrorLog, writeNoticeTypeErrorLog, writeDistrictErrorLog, writeFeedbackLogs,
+  listScopeErrorLogs, listQualErrorLogs, listNoticeTypeErrorLogs, listDistrictErrorLogs,
   resolveScopeError, resolveNoticeTypeError, getErrorLogCounts,
   // Loop 31: AI 学习历史（dashboard 时序）
   recordAILearnedHistory, getAILearnedHistory,
