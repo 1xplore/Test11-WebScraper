@@ -290,28 +290,40 @@ function backfillAnnouncementTags({ batchSize = 200, dryRun = false } = {}) {
   const ruleLearner = require('../services/ruleLearner');
   const qualRules = listQualRules({ enabledOnly: true });
   const noticeRules = listNoticeTypeRules({ enabledOnly: true });
+  const districtRules = listDistrictRules({ enabledOnly: true });
   const qualDyn = ruleLearner.buildDynamicRules(qualRules);
   const noticeDyn = ruleLearner.buildDynamicRules(noticeRules);
+  const districtDyn = ruleLearner.buildDynamicRules(districtRules);
 
   let updated = 0, skipped = 0, failed = 0;
   const total = db.prepare('SELECT COUNT(*) AS n FROM announcements').get().n;
   let offset = 0;
   while (offset < total) {
     const rows = db.prepare(
-      `SELECT id, title, description, requirement, raw_text, qual_tags, notice_type_tags
+      `SELECT id, title, description, requirement, raw_text, address, qual_tags, notice_type_tags, district
        FROM announcements ORDER BY id LIMIT ? OFFSET ?`
     ).all(batchSize, offset);
 
     for (const a of rows) {
-      // 任意一边已填就跳过（avoid 覆盖 AI 学出的人工修过内容）
+      // 三个 tag 都非空才 skip（避免覆盖 AI 学出/人工修过）
       const qualEmpty = !a.qual_tags || a.qual_tags === '[]' || a.qual_tags === '';
       const noticeEmpty = !a.notice_type_tags || a.notice_type_tags === '[]' || a.notice_type_tags === '';
-      if (qualEmpty && noticeEmpty) { skipped++; continue; }
+      // announcements.district 之前字段是 JSON array 但常 '[]' / 空 / NULL
+      // 视为空用：原值不存在 / '[]' / ''
+      const districtVal = a.district;
+      let districtEmpty = !districtVal || districtVal === '[]' || districtVal === '';
+      try {
+        // parse 一下 JSON 数组（之前 backfill 写过的可能 '["xxx"]'）
+        const parsed = districtVal ? JSON.parse(districtVal) : [];
+        if (Array.isArray(parsed) && parsed.length > 0) districtEmpty = false;
+      } catch (_) { /* JSON parse fail = keep empty */ }
+      if (qualEmpty && noticeEmpty && districtEmpty) { skipped++; continue; }
 
       let updates, params;
       try {
         const qualText = (a.requirement || '').trim() || (a.raw_text || '').slice(0, 800);
         const noticeText = `${a.title || ''}\n${a.description || a.raw_text || ''}`.slice(0, 1000);
+        const districtText = `${a.address || ''} ${a.title || ''}`.trim();
 
         updates = [];
         params = [];
@@ -327,6 +339,13 @@ function backfillAnnouncementTags({ batchSize = 200, dryRun = false } = {}) {
           if (noticeTags.length) {
             updates.push('notice_type_tags = ?');
             params.push(toJsonArray(noticeTags));
+          }
+        }
+        if (districtEmpty && districtText) {
+          const districtTags = matching.inferDistrict(districtText, districtDyn);
+          if (districtTags.length) {
+            updates.push('district = ?');
+            params.push(toJsonArray(districtTags));
           }
         }
         if (updates.length === 0) { skipped++; continue; }
