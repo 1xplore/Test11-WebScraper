@@ -163,7 +163,7 @@ Gitee 远程已弃用（2026-07 token 失效后停推）。不再恢复，部署
 | 前端 | (无) | nginx 直接 serve static，不需要独立端口 |
 
 **目录**：`/home/admin/scraper/Test11-WebScraper/`（与 paytrack 的 `/home/admin/test8-pay-track/` 平级）
-- `backend/` — Express 源码（含 `.env`、`uploads/`、`src/server.js` 改 PORT=4002）
+- `server/` — Express 源码（含 `.env`、`uploads/`、`src/server.js` 改 PORT=4002）
 - `frontend/dist/` — `npm run build` 产物，nginx 直接 serve
 - `logs/` — 运行时日志（**部署不动**）
 
@@ -181,7 +181,7 @@ COPYFILE_DISABLE=1 tar --exclude='.git' \
   --exclude='*/logs/*.log' --exclude='data/' \
   --exclude='*.tar.gz' \
   -czf /tmp/bid-deploy.tar.gz \
-  backend/ frontend/dist/ package.json
+  server/ frontend/dist/ package.json
 
 # 上传
 scp /tmp/bid-deploy.tar.gz admin@47.122.112.224:/tmp/
@@ -193,7 +193,7 @@ ssh admin@47.122.112.224 <<'EOF'
   tar -xzf /tmp/bid-deploy.tar.gz
   # 清掉可能的 macOS 残留（即使 COPYFILE_DISABLE=1 偶尔也会有）
   find . -name '._*' -delete
-  cd backend && npm install --omit=dev
+  cd server && npm install --omit=dev
   # 启动后端（用 nohup；不要 pkill -f 'node'，会误杀其他项目）
   ss -tlnp | grep ':4002 ' && echo 'port 4002 already in use, abort' && exit 1
   PORT=4002 nohup node src/server.js > /home/admin/scraper/Test11-WebScraper/logs/backend.log 2>&1 &
@@ -210,7 +210,7 @@ ssh admin@47.122.112.224 "sudo certbot --nginx -d bid.1xplore.cn --non-interacti
 # 本地改完 → 重 build → 重打包 → 重 scp（不需要重启 nginx，static 文件覆盖即可）
 # 后端代码改了才需要重启：进服务器，按端口 :4002 找 PID，kill 后 nohup 重启
 PID=$(ssh admin@47.122.112.224 "ss -tlnp | grep ':4002 ' | grep -oE 'pid=[0-9]+' | head -1 | cut -d= -f2")
-[ -n "$PID" ] && ssh admin@47.122.112.224 "kill $PID && cd /home/admin/scraper/Test11-WebScraper/backend && PORT=4002 nohup node src/server.js > ../logs/backend.log 2>&1 &"
+[ -n "$PID" ] && ssh admin@47.122.112.224 "kill $PID && cd /home/admin/scraper/Test11-WebScraper/server && PORT=4002 nohup node src/server.js > ../logs/backend.log 2>&1 &"
 ```
 
 **SSL 自动续期**：certbot 已装 systemd timer / cron，每 60 天自动续。续期失败时 nginx 会用旧证书（不会自动 fail），需要监控 `/var/log/letsencrypt/letsencrypt.log`。

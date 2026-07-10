@@ -83,6 +83,8 @@ function migrate() {
 }
 
 migrate();
+const seed = require('./seed');
+seed(db);
 
 console.log(`[db] SQLite 已就绪: ${DB_PATH}`);
 
