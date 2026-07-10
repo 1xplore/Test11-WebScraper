@@ -56,6 +56,7 @@ export const fetcher = {
   learnFromMiss: (id) => api.post('/scope-rules/learn-from-miss', { announcementId: id }).then((r) => r.data),
   learnQualFromMiss: (id) => api.post('/qual-rules/learn-from-miss', { announcementId: id }).then((r) => r.data),
   learnNoticeTypeFromMiss: (id) => api.post('/notice-rules/learn-from-miss', { announcementId: id }).then((r) => r.data),
+  learnDistrictFromMiss: (id) => api.post('/district-rules/learn-from-miss', { announcementId: id }).then((r) => r.data),
   listPlatforms: (params) =>
     api.get('/platforms', { params }).then((r) => r.data),
   patchPlatform: (scriptId, body) =>

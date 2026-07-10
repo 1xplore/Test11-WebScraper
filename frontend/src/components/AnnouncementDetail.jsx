@@ -35,11 +35,16 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
   // - scope_tags: 空 / ['其他'] / ['未匹配'] → 未命中
   // - qual_tags: 空 / ['未匹配'] → 未命中
   // - notice_type_tags: 空数组 → 未命中
+  // - district: 空 / [] → 未命中
   const isScopeMiss = !item?.scope_tags
     || (item.scope_tags.length === 1 && ['其他', '未匹配'].includes(item.scope_tags[0]));
   const isQualMiss = !item?.qual_tags
     || (item.qual_tags.length === 1 && item.qual_tags[0] === '未匹配');
   const isNoticeTypeMiss = !item?.notice_type_tags || item.notice_type_tags.length === 0;
+  // announcements.district 是 JSON array 字段（loop 32 之前 schema 里就有）
+  const isDistrictMiss = !item?.district
+    || (Array.isArray(item.district) && item.district.length === 0)
+    || (typeof item.district === 'string' && (item.district === '' || item.district === '[]'));
   const [saving, setSaving] = useState(false);
   const [reviewNote, setReviewNote] = useState('');
 
@@ -157,6 +162,28 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
       setLearnNoticeTypeResult({ applied: false, error: e.message });
     } finally {
       setLearnNoticeTypeLoading(false);
+    }
+  }
+
+  // Loop 36: 第 4 个 banner — district 自迭代
+  const [learnDistrictResult, setLearnDistrictResult] = useState(null);
+  const [learnDistrictLoading, setLearnDistrictLoading] = useState(false);
+  async function runLearnDistrictFromMiss() {
+    if (!item || learnLoading || learnQualLoading || learnNoticeTypeLoading || learnDistrictLoading) return;
+    setLearnDistrictLoading(true);
+    setLearnDistrictResult(null);
+    try {
+      const r = await fetcher.learnDistrictFromMiss(item.id);
+      setLearnDistrictResult(r);
+      if (r.applied) {
+        const fresh = await fetcher.getAnnouncement(item.id);
+        setItem(fresh);
+        onChanged?.(fresh);
+      }
+    } catch (e) {
+      setLearnDistrictResult({ applied: false, error: e.message });
+    } finally {
+      setLearnDistrictLoading(false);
     }
   }
 
@@ -351,6 +378,47 @@ export default function AnnouncementDetail({ id, open, onOpenChange, onChanged }
                   title="让 AI 判断本公告类型（如招标公告/资格预审公告/竞争性磋商公告）、沉淀 notice_type_rules"
                 >
                   {learnNoticeTypeLoading ? '学类型中…' : 'AI 学类型'}
+                </Button>
+              )}
+            </div>
+
+            {/* AI 学一下（区域） —— 第四套 self-growth (Loop 32)：让 AI 从 address 抽 district，沉淀 district_rules */}
+            <div className="ai-banner mt-2" style={{ borderColor: 'var(--accent)' }}>
+              <div>
+                <Brain className="h-3.5 w-3.5 inline mr-1 text-accent" />
+                <span className="ai-banner-text">AI 学一下（区域）</span>
+                {!isDistrictMiss && (() => {
+                  const list = Array.isArray(item.district) ? item.district
+                    : (typeof item.district === 'string' && item.district ? JSON.parse(item.district) : []);
+                  return list && list.length > 0 ? (
+                    <span className="ml-3 text-success-fg text-xs">
+                      ✓ 已推断：{list.join('、')}
+                    </span>
+                  ) : null;
+                })()}
+                {learnDistrictResult?.applied && (
+                  <span className="ml-3 text-success-fg">
+                    沉淀成功：tag=<b>{learnDistrictResult.rule?.tag}</b>，关键词={JSON.stringify(learnDistrictResult.rule?.keywords)}
+                    {learnDistrictResult.districtTags ? ` · 本公告 tags=${JSON.stringify(learnDistrictResult.districtTags)}` : ''}
+                    {learnDistrictResult.reason ? ` · ${learnDistrictResult.reason}` : ''}
+                  </span>
+                )}
+                {learnDistrictResult?.applied === false && learnDistrictResult?.message && (
+                  <span className="ml-3 text-warning-fg">{learnDistrictResult.message}</span>
+                )}
+                {learnDistrictResult?.applied === false && learnDistrictResult?.error && (
+                  <span className="ml-3 text-danger">{learnDistrictResult.error}</span>
+                )}
+              </div>
+              {isDistrictMiss && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={learnLoading || learnQualLoading || learnNoticeTypeLoading || learnDistrictLoading}
+                  onClick={runLearnDistrictFromMiss}
+                  title="让 AI 从 address 抽取行政区（如东西湖区/黄陂区），沉淀 district_rules"
+                >
+                  {learnDistrictLoading ? '学区域中…' : 'AI 学区域'}
                 </Button>
               )}
             </div>
